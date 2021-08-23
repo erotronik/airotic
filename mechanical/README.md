@@ -1,4 +1,4 @@
-# Printing and assembling the hardware
+# Printing and assembling the bottle
 ## Parts list:
 * The STL files for the cap, cover, spigot and LED covers
 * A [RYACO 800ml wide mouth bottle](https://www.amazon.co.uk/dp/B088B7RL98/ref=cm_sw_r_tw_dp_RTAABATTSC8DW0E9HZ2Y)
