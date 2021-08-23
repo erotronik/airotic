@@ -34,7 +34,12 @@
 
 Now you can connect to the board via bluetooth and set some defaults if you wish
 
-## Connecting via bluetooth
+## Troubleshooting
 
-to come
+* On startup both LEDs should turn white briefly. If only one turns white check the connections between the LEDs.
+
+* If the blowing over the sensor doesn't cause anything to happen, look at the serial console in the Arduino
+application when starting up. It may be that the sensor isn't being detected. This could be because of a bad
+sensor (out of the 6 we bought 1 was faulty) or the connections are bad (check SDA and SCL are the right way
+around)
 
