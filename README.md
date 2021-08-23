@@ -29,6 +29,7 @@ This bubbler bottle is designed for your own personal use in a situation where y
 
 ## Build your own
 
-* For mechanical construction detail and 3D files see the   mechanical/  directory
-* For electronics construction details see the  electronics/  directory
-* For the arduino code see the  arduino/  directory
+* [mechanical construction detail and 3D files](mechanical/)
+* [electronics construction details](electronics/)
+* [arduino code](arduino/)
+* [user guide](userguide/)
