@@ -2,12 +2,14 @@
 
 ## Parts list
 
-* Adafruit Itsy Bitsy NRF52480 Express [(uk: Pimoroni)](https://shop.pimoroni.com/products/adafruit-itsybitsy-nrf52840-express-bluetooth-le)
-* BMP280 Barometric pressure sensor [(uk: various ebay sellers)](https://www.ebay.co.uk/itm/283518687928)
-* 2 pairs of micro 3 pin JST 1.25 connectors (or any small 3 pin connectors or just hard wire instead) [(uk: various ebay sellers)](https://www.ebay.co.uk/itm/301857866521)
-* one or two M2.5 5mm screws
-* Two WS2812b (neopixels) on small round PCB [(uk: various ebay sellers)](https://www.ebay.co.uk/itm/203167394144)
-* A tiny bit of double sided foam tape (or hotglue)
+|Item|UK Seller|USA Seller|
+|--|--|--|
+| Adafruit Itsy Bitsy NRF52480 Express |[Pimoroni](https://shop.pimoroni.com/products/adafruit-itsybitsy-nrf52840-express-bluetooth-le)| [Adafruit](https://www.adafruit.com/product/4481) |
+| BMP280 Barometric pressure sensor |[various ebay sellers](https://www.ebay.co.uk/itm/283518687928)|[various ebay sellers](https://www.ebay.com/itm/133104662930)|
+| 2 pairs of micro 3 pin JST 1.25 connectors (or any small 3 pin connectors or just hard wire instead) |[various ebay sellers](https://www.ebay.co.uk/itm/301857866521)|[Adafruit](https://www.adafruit.com/product/4721)|
+| Two WS2812b (neopixels) on small round PCB|[various ebay sellers](https://www.ebay.co.uk/itm/203167394144)|[Adafruit](https://www.adafruit.com/product/1612)
+| A tiny bit of double sided foam tape (or hotglue)||[Adafruit](https://www.adafruit.com/product/5019)|
+| one or two M2.5 5mm screws||
 
 ## Construction
 
