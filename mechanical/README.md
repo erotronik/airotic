@@ -22,6 +22,7 @@
 ### Step 5
 * Sand, paint or finish to your own taste
 * We suggest not altering the area of the cap where the electronics will go to avoid changing the fit
+* You can remove the logo on the bottle with a sharp blade by carefully scraping the letters off.
 ### Step 6
 * Remove the seal from the RYACO bottle lid and insert it into the channel on the cap's underside
 ### Step 7
