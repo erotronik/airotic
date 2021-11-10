@@ -128,16 +128,17 @@ void comms_uart_colorpicker(void) {
         uint8_t r = bleuart.read();
         uint8_t g = bleuart.read();
         uint8_t b = bleuart.read();
-        leds[0].setRGB(r, g, b);
-        leds[1].setRGB(r, g, b);
-        FastLED.show();
         CRGB x = CRGB(r, g, b);
         if (last_button == 0 || last_button == 1) {
           colorTarget = rgb2hsv_approximate(x);
           colorMyTarget = colorTarget;
-        } else if (last_button == 2) {
+          fill_solid( leds, NUM_LEDS, colorTarget );
+          FastLED.show();        
+        } else if (last_button == 2) {          
           colorStart = rgb2hsv_approximate(x);
           colorMyStart = colorStart;
+          fill_solid( leds, NUM_LEDS, colorStart );
+          FastLED.show();           
         }
         storage_write();
       } else if (command == 'B') {
