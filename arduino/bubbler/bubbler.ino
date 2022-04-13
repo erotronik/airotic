@@ -118,7 +118,6 @@ void check_breath() {
     fadespeed = 16;
   }
   if (debug_mode & 1) comms_uart_send_graph(pread, avg);
-  //Serial.printf("%d,%d,%d\n",pread,avg,avg-avthres);
   avg = (avg * 8 + pread * 2) / 10;
 
 }

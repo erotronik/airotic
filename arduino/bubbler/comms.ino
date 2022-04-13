@@ -6,7 +6,7 @@ BLEUart bleuart;
 
 void comms_init(short myid) {
   char buf[15];
-  snprintf(buf, 15, "Air%02d", myid);
+  snprintf(buf, 15, "HRS Bubbler %02d", myid);
   Bluefruit.begin(1, 1);
   //Serial.println(NRF_FICR->DEVICEADDR0);
   Bluefruit.setTxPower(4);
@@ -59,6 +59,8 @@ void comms_connect_callback(uint16_t conn_handle)
   connection->getPeerName(central_name, sizeof(central_name));
   Serial.print("Connected to ");
   Serial.println(central_name);
+
+  btAndSerialPrintLn(strprintf("Connected to %s", central_name));
 }
 
 void comms_send_response(char const *response) {
@@ -67,33 +69,27 @@ void comms_send_response(char const *response) {
 }
 
 void comms_send_breath(boolean b) {
-  if ( Bluefruit.connected()) {
-    if (b) {
-      bleuart.printf("*B\n");
-    } else {
-      bleuart.printf("*R\n");
-    }
+  if (b) {
+    btAndSerialPrintLn("*B");
+  } else {
+    btAndSerialPrintLn("*R");
   }
 }
 
 void comms_uart_send_bottles() {
   if (millis() / 100 % 5 != 0) return;
 
-  if ( Bluefruit.connected())  {
-    for (short i = 0; i < MAX_BOTTLES; i++) {
-       if (seen_bottles[i].rssi_av<128) {
-         bleuart.printf("%d\r\n",seen_bottles[i].rssi_av);
-       }
-    }
+  for (short i = 0; i < MAX_BOTTLES; i++) {
+     if (seen_bottles[i].rssi_av<128) {
+       btAndSerialPrintLn(strprintf("%d\r\n",seen_bottles[i].rssi_av));
+     }
   }
 }
 
 boolean comms_uart_send_graph(int pread, int avg) {
-  if ( Bluefruit.connected())  {
-    bleuart.printf("%d,%d\r\n",pread,avg);
-    return true;
-  }
-  return false;
+  btAndSerialPrintLn(strprintf("%d,%d\r\n",pread,avg));
+  
+  return true;
 #if 0
   Serial.print(pread);
   Serial.print(",");
@@ -117,61 +113,89 @@ void comms_uart_colorpicker(void) {
   // !D[0-9] - Debug mode (&1 is "breath sensor graph")(&2 is "rssid")
   //
   
-  if ( Bluefruit.connected() && bleuart.notifyEnabled() ) {
-    int command = bleuart.read();
-    if (command == '!') {
-      command = bleuart.read();
-      if (command == 'H') {
-          bleuart.printf("Hello I am bottle %d\n", bottle_number);  
-      }
-      else if (command == 'C') {
-        uint8_t r = bleuart.read();
-        uint8_t g = bleuart.read();
-        uint8_t b = bleuart.read();
-        CRGB x = CRGB(r, g, b);
-        if (last_button == 0 || last_button == 1) {
-          colorTarget = rgb2hsv_approximate(x);
-          colorMyTarget = colorTarget;
-          fill_solid( leds, NUM_LEDS, colorTarget );
-          FastLED.show();        
-        } else if (last_button == 2) {          
-          colorStart = rgb2hsv_approximate(x);
-          colorMyStart = colorStart;
-          fill_solid( leds, NUM_LEDS, colorStart );
-          FastLED.show();           
-        }
-        storage_write();
-      } else if (command == 'B') {
-        command = bleuart.read();
-        if (command == '4') {
-          NVIC_SystemReset();
-        }
-        last_button = command - '0';
-        if (last_button == 3) {
-          colorTarget = colorTargetDefault;
-          colorStart = colorStartDefault;
-          storage_write();
-          comms_send_response("ok");
-        }
-      } else if (command == 'S') {
-        command = bleuart.read();
-        bottle_number = (command - '0')*10;
-        command = bleuart.read();
-        bottle_number += (command - '0');        
-        if (bottle_number < MAX_BOTTLES) {
-          storage_write();
-          comms_send_response("ok, set, rebooting");
-          delay(100);
-          NVIC_SystemReset();          
-        } else {
-          comms_send_response("bad number");
-        }
-      } else if (command == 'D') {
-        command = bleuart.read();
-        debug_mode = command - '0';
-        comms_send_response("ok");
-      }
+  if (!Bluefruit.connected() || !bleuart.notifyEnabled() ) {
+    return;
+  }
+  
+  int command = bleuart.read();
+  
+  if (command != '!') {
+    return;
+  }
+
+  command = bleuart.read();
+
+  // Introduce
+  if (command == 'H') {
+      btAndSerialPrintLn(strprintf("Hello I am bottle %d", bottle_number));
+      return;
+  } 
+
+  // Set color
+  if (command == 'C') {
+    uint8_t r = bleuart.read();
+    uint8_t g = bleuart.read();
+    uint8_t b = bleuart.read();
+    CRGB x = CRGB(r, g, b);
+    if (last_button == 0 || last_button == 1) {
+      colorTarget = rgb2hsv_approximate(x);
+      colorMyTarget = colorTarget;
+      fill_solid( leds, NUM_LEDS, colorTarget );
+      FastLED.show();        
+    } else if (last_button == 2) {          
+      colorStart = rgb2hsv_approximate(x);
+      colorMyStart = colorStart;
+      fill_solid( leds, NUM_LEDS, colorStart );
+      FastLED.show();           
     }
+    storage_write();
+    return;
+  }
+
+  if (command == 'B') {
+    command = bleuart.read();
+
+    // Reboot bottle
+    if (command == '4') {
+      NVIC_SystemReset();
+    }
+    last_button = command - '0';
+
+    // Reset colors to defaults
+    if (last_button == 3) {
+      colorTarget = colorTargetDefault;
+      colorStart = colorStartDefault;
+      storage_write();
+      comms_send_response("ok");
+    }
+    return;
+  }
+
+  // Set bottle number
+  if (command == 'S') {
+    command = bleuart.read();
+    bottle_number = (command - '0')*10;
+    
+    command = bleuart.read();
+    bottle_number += (command - '0');
+     
+    if (bottle_number < MAX_BOTTLES) {
+      storage_write();
+      comms_send_response("ok, set, rebooting");
+      delay(100);
+      NVIC_SystemReset();          
+    } else {
+      comms_send_response("bad number");
+    }
+    return;
+  }
+
+  // Set debug mode
+  if (command == 'D') {
+    command = bleuart.read();
+    debug_mode = command - '0';
+    comms_send_response("ok");
+    return;
   }
 }
 
@@ -221,4 +245,28 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
     }
   }
   Bluefruit.Scanner.resume();
+}
+
+void btAndSerialPrintLn(const char* format) {
+  if (Bluefruit.connected()) {
+    bleuart.println(format);
+  }
+  
+  Serial.println(format);
+}
+
+char* strprintf(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  
+  int bufferSize = vsnprintf(NULL, 0, format, args);
+  bufferSize++;  // safe byte for \0
+  
+  char* buffer = new char[bufferSize];
+
+  vsnprintf(buffer, bufferSize, format, args);
+
+  va_end(args);
+
+  return buffer;
 }
