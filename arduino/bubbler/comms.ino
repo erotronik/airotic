@@ -6,7 +6,7 @@ BLEUart bleuart;
 
 void comms_init(short myid) {
   char buf[15];
-  snprintf(buf, 15, "HRS Bubbler %02d", myid);
+  snprintf(buf, 15, "Air%02d", myid);
   Bluefruit.begin(1, 1);
   //Serial.println(NRF_FICR->DEVICEADDR0);
   Bluefruit.setTxPower(4);
