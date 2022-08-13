@@ -1,4 +1,15 @@
-# User Guide
+# User Guide for connecting to DG-Labs Coyote box
+
+The bottle will look for DG-Labs Coyote bluetooth powerboxes. If it
+finds one it will connect to it and send 5 'breath' waves to both A
+and B channels at level '150' (defined in coyote.h, usually 2000
+max). Then every breath sends a 'breath' wave to channels A and B. You
+can alter the level up and down using the rocker switches on the box,
+these are forgotten when you disconnect.  Holding a rocker switch will
+reset the channel to zero and you'll need to disconnect or restart the
+bottle to get back to the default.
+
+# User Guide for connecting via bluetooth
 
 You can connect to the device using any bluetooth serial (UART) application, but the easiest is the phone app ["Bluefruit Connect"](https://learn.adafruit.com/bluefruit-le-connect) from Adafruit.
 
