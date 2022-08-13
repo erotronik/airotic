@@ -14,6 +14,7 @@ The next generation of bubbler bottles, with RGB lighting and bluetooth.
 * Low cost compared to commercial bottles
 * Uses easily sourced parts including bottle, pressure sensor module, Bluetooth Arduino board
 * Powered by small USB portable power pack, will run for a day even on the smallest packs
+* Can connect to Coyote DG-Labs e-stim box
 * Other features and modes to be announced and released
 * Open Source software and hardware design
 

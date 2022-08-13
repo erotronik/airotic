@@ -1,4 +1,5 @@
 BLEUart bleuart;
+#include "coyote.h"
 
 // https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers steal a name nothing over 0x1000 is used anyway
 #define our_fake_company_id0 0xf1
@@ -21,7 +22,11 @@ void comms_init(short myid) {
   Bluefruit.Scanner.useActiveScan(false); // only need an rssi
   Bluefruit.Scanner.start(0); // 0 = Don't stop scanning after n seconds
 
+  Bluefruit.Central.setDisconnectCallback(central_disconnect_callback);
+  Bluefruit.Central.setConnectCallback(central_connect_callback);
+
   comms_start_adv();
+  coyote_setup();
 }
 
 void comms_start_adv(void)
@@ -61,6 +66,7 @@ void comms_connect_callback(uint16_t conn_handle)
 
 void comms_send_breath(boolean b) {
   btAndSerialPrintf("*%c\n",b?'B':'R');
+  coyote_cb(b);
 }
 
 void comms_uart_send_bottles() {
@@ -186,7 +192,13 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
   uint8_t buffer[32];
   uint8_t len = Bluefruit.Scanner.parseReportByType(report, BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA, buffer, sizeof(buffer));
 
-  if (len > 2 && buffer[1] == our_fake_company_id1 && buffer[0] == our_fake_company_id0) {
+  if (len > 2 && buffer[1] == 0x19 && buffer[0] == 0x96) {
+    //
+    // Found a Coyote
+    //
+    btAndSerialPrintf("Found DG-LAB\n");
+    Bluefruit.Central.connect(report);
+  } else if (len > 2 && buffer[1] == our_fake_company_id1 && buffer[0] == our_fake_company_id0) {
     //
     // Found a Bottle
     //
