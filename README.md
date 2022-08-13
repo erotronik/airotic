@@ -29,6 +29,10 @@ We really didn't want to make and sell them. So why not build your own? Please d
 
 This bubbler bottle is designed for your own personal use in a situation where you have the ability to disconnect your mask. It is not designed to restrict or block any ability to breathe. The bottle also works just fine without any liquid and will still light up and detect breathing. If you plan to use them at an event please check with an event organiser first.
 
+## Battery Safety
+
+We have designed the bubbler bottle to use an external USB Powerbank. This is deliberate and we did not want to use a LIPO battery. We have personally witnessed several LIPO failures over the years, some while charging, but not always. The last thing you want is your LIPO battery to explode or start venting lithium gasses into your breathing path. 
+
 ## Build your own
 
 To make your own bottle you need to buy a few things, 3D print a few things, solder a few things, and use a PC to upload the program.
