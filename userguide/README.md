@@ -9,6 +9,11 @@ these are forgotten when you disconnect.  Holding a rocker switch will
 reset the channel to zero and you'll need to disconnect or restart the
 bottle to get back to the default.
 
+Note that it will only connect to one box at a time. If you are in an
+environment like a club where there might be other devices please be
+careful as it will connect to any boxes that are currently turned on and
+not being used by some other app.
+
 # User Guide for connecting via bluetooth
 
 You can connect to the device using any bluetooth serial (UART) application, but the easiest is the phone app ["Bluefruit Connect"](https://learn.adafruit.com/bluefruit-le-connect) from Adafruit.
