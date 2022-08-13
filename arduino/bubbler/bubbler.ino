@@ -24,8 +24,8 @@
 // Push Control pad 3 - to reset to more sensible defaults
 // Push Control pad 4 - restart device so we advertise correct colours and name
 // Use UART mode and type "!S1" to set device to ID 1 (1-9 allowed)
-//
 
+//
 // rssi average below which we merge the LEDS of seen bottles
 // not configurable as kind of needs to be the same on each bottle to work
 #define DISTANCE_TO_SYNC_LEDS 64

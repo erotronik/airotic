@@ -24,7 +24,6 @@ void comms_init(short myid) {
   comms_start_adv();
 }
 
-
 void comms_start_adv(void)
 {
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
@@ -57,57 +56,34 @@ void comms_connect_callback(uint16_t conn_handle)
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
   char central_name[32] = { 0 };
   connection->getPeerName(central_name, sizeof(central_name));
-  Serial.print("Connected to ");
-  Serial.println(central_name);
-}
-
-void comms_send_response(char const *response) {
-  Serial.printf("Send Response: %s\n", response);
-  bleuart.write(response, strlen(response)*sizeof(char));
+  btAndSerialPrintf("Connected to %s",central_name);
 }
 
 void comms_send_breath(boolean b) {
-  if ( Bluefruit.connected()) {
-    if (b) {
-      bleuart.printf("*B\n");
-    } else {
-      bleuart.printf("*R\n");
-    }
-  }
+  btAndSerialPrintf("*%c\n",b?'B':'R');
 }
 
 void comms_uart_send_bottles() {
   if (millis() / 100 % 5 != 0) return;
 
-  if ( Bluefruit.connected())  {
-    for (short i = 0; i < MAX_BOTTLES; i++) {
-       if (seen_bottles[i].rssi_av<128) {
-         bleuart.printf("%d\r\n",seen_bottles[i].rssi_av);
-       }
-    }
+  for (short i = 0; i < MAX_BOTTLES; i++) {
+     if (seen_bottles[i].rssi_av<128) {
+       btAndSerialPrintf("%d\r\n",seen_bottles[i].rssi_av);
+     }
   }
 }
 
 boolean comms_uart_send_graph(int pread, int avg) {
-  if ( Bluefruit.connected())  {
-    bleuart.printf("%d,%d\r\n",pread,avg);
-    return true;
-  }
-  return false;
-#if 0
-  Serial.print(pread);
-  Serial.print(",");
-  Serial.print(avg);
-  Serial.print(",");
-  Serial.println(blow_state * 100 + 100800);
-#endif
+  btAndSerialPrintf("%d,%d\r\n",pread,avg);
+  return true;
 }
 
 short last_button = 0;
 
 void comms_uart_colorpicker(void) {
-   // Respond to the Adafruit client so we don't need to bother to write one, plus extra commands
-   //
+  boolean bt = false;
+  // Respond to the Adafruit client so we don't need to bother to write one, plus extra commands
+  //
   // !C[RGB] - set color of LED selected by below
   // !B1 - LED to change is the target (default)
   // !B2 - LED to change is the start
@@ -117,61 +93,67 @@ void comms_uart_colorpicker(void) {
   // !D[0-9] - Debug mode (&1 is "breath sensor graph")(&2 is "rssid")
   //
   
-  if ( Bluefruit.connected() && bleuart.notifyEnabled() ) {
-    int command = bleuart.read();
-    if (command == '!') {
-      command = bleuart.read();
-      if (command == 'H') {
-          bleuart.printf("Hello I am bottle %d\n", bottle_number);  
-      }
-      else if (command == 'C') {
-        uint8_t r = bleuart.read();
-        uint8_t g = bleuart.read();
-        uint8_t b = bleuart.read();
-        CRGB x = CRGB(r, g, b);
-        if (last_button == 0 || last_button == 1) {
-          colorTarget = rgb2hsv_approximate(x);
-          colorMyTarget = colorTarget;
-          fill_solid( leds, NUM_LEDS, colorTarget );
-          FastLED.show();        
-        } else if (last_button == 2) {          
-          colorStart = rgb2hsv_approximate(x);
-          colorMyStart = colorStart;
-          fill_solid( leds, NUM_LEDS, colorStart );
-          FastLED.show();           
-        }
-        storage_write();
-      } else if (command == 'B') {
-        command = bleuart.read();
-        if (command == '4') {
-          NVIC_SystemReset();
-        }
-        last_button = command - '0';
-        if (last_button == 3) {
-          colorTarget = colorTargetDefault;
-          colorStart = colorStartDefault;
-          storage_write();
-          comms_send_response("ok");
-        }
-      } else if (command == 'S') {
-        command = bleuart.read();
-        bottle_number = (command - '0')*10;
-        command = bleuart.read();
-        bottle_number += (command - '0');        
-        if (bottle_number < MAX_BOTTLES) {
-          storage_write();
-          comms_send_response("ok, set, rebooting");
-          delay(100);
-          NVIC_SystemReset();          
-        } else {
-          comms_send_response("bad number");
-        }
-      } else if (command == 'D') {
-        command = bleuart.read();
-        debug_mode = command - '0';
-        comms_send_response("ok");
-      }
+  if ( Bluefruit.connected() && bleuart.notifyEnabled() ) 
+    bt = true;
+  if (!bt && Serial.available()<1)
+    return;
+
+  int command = bt?bleuart.read():Serial.read();
+  if (command != '!') 
+     return;
+     
+  command = bt?bleuart.read():Serial.read();
+  if (command == 'H') {
+      btAndSerialPrintf("*Hello I am bottle %d\n", bottle_number);  
+  }
+  else if (command == 'C') {
+    uint8_t r = bt?bleuart.read():Serial.read(); // TODO: might want to do this different for serial
+    uint8_t g = bt?bleuart.read():Serial.read();
+    uint8_t b = bt?bleuart.read():Serial.read();
+    CRGB x = CRGB(r, g, b);
+    if (last_button == 0 || last_button == 1) {
+      colorTarget = rgb2hsv_approximate(x);
+      colorMyTarget = colorTarget;
+      fill_solid( leds, NUM_LEDS, colorTarget );
+      FastLED.show();        
+    } else if (last_button == 2) {          
+      colorStart = rgb2hsv_approximate(x);
+      colorMyStart = colorStart;
+      fill_solid( leds, NUM_LEDS, colorStart );
+      FastLED.show();           
     }
+    storage_write();
+  } else if (command == 'B') {
+    command = bt?bleuart.read():Serial.read();
+    if (command == '4') {
+      btAndSerialPrintf("rebooting\n");
+      delay(100);
+      NVIC_SystemReset();
+    }
+    last_button = command - '0';
+    if (last_button == 3) {
+      colorTarget = colorTargetDefault;
+      colorStart = colorStartDefault;
+      storage_write();
+      btAndSerialPrintf("ok\n");
+    }
+  } else if (command == 'S') {
+    command = bt?bleuart.read():Serial.read();
+    bottle_number = (command - '0')*10;
+    command = bt?bleuart.read():Serial.read();
+    bottle_number += (command - '0');        
+    if (bottle_number < MAX_BOTTLES) {
+      storage_write();
+      btAndSerialPrintf("ok, set, rebooting\n");
+      delay(100);
+      NVIC_SystemReset();          
+    } else {
+      btAndSerialPrintf("bad number\n");
+    }
+  } else if (command == 'D') {
+    command = bt?bleuart.read():Serial.read();
+    debug_mode = command - '0';
+    btAndSerialPrintf("ok\n");
   }
 }
 
@@ -184,15 +166,15 @@ void comms_check_distance(int distance) {
   for (short i = 0; i < MAX_BOTTLES; i++) {
     if (seen_bottles[i].rssi_av != 128 && (millis() - seen_bottles[i].rssi_last > 10000)) {
       seen_bottles[i].rssi_av = 128;
-      Serial.printf("Bottle %d has departed\n", i);
+      btAndSerialPrintf("Bottle %d has departed\n", i);
     }
     if (seen_bottles[i].rssi_av <= distance && seen_bottles[i].state == 0) {
-      Serial.printf("Bottle %d is close %d\n", i, seen_bottles[i].rssi_av);
+      btAndSerialPrintf("Bottle %d is close %d\n", i, seen_bottles[i].rssi_av);
       seen_bottles[i].state = 1;
       seen_bottles[i].changed_state = true;
     }
     if (seen_bottles[i].rssi_av >= (distance + 6) && seen_bottles[i].state == 1) {
-      Serial.printf("Bottle %d is away %d\n", i, seen_bottles[i].rssi_av);
+      btAndSerialPrintf("Bottle %d is away %d\n", i, seen_bottles[i].rssi_av);
       seen_bottles[i].state = 0;
       seen_bottles[i].changed_state = true;
     }
@@ -211,7 +193,7 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
     short bottleno = buffer[2] & 0xf;
     if (bottleno&1 == 1) {  // we only look at odd id bottles
       if (seen_bottles[bottleno].rssi_av == 128) {
-        Serial.printf("How do you do fellow bottle #%d (%d)\n", bottleno, 0 - report->rssi);
+        btAndSerialPrintf("How do you do fellow bottle #%d (%d)\n", bottleno, 0 - report->rssi);
         seen_bottles[bottleno].rssi_av = 0 - report->rssi;
         seen_bottles[bottleno].colorTarget = CHSV(buffer[3], buffer[4], 255);
         seen_bottles[bottleno].colorStart = CHSV(buffer[5], buffer[6], 255);
@@ -221,4 +203,22 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
     }
   }
   Bluefruit.Scanner.resume();
+}
+
+void btAndSerialPrintf(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+
+  int bufferSize = vsnprintf(NULL, 0, format, args)+1;
+  char* buffer = new char[bufferSize];
+
+  vsnprintf(buffer, bufferSize, format, args);
+
+  if (Bluefruit.connected()) 
+      bleuart.print(buffer);
+  Serial.print(buffer);
+
+  va_end(args);
+
+  delete(buffer);
 }
