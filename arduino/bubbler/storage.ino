@@ -1,3 +1,5 @@
+#ifndef ESP32
+
 // No EEPROM.h on the itsybitsy so instead use SPI flash and store stuff in a file
 
 #include <SPI.h>
@@ -46,3 +48,11 @@ void storage_setup() {
     NVIC_SystemReset();
   }
 }
+
+#else
+
+#include <Arduino.h>
+#include "FS.h"
+#include <LittleFS.h>
+
+#endif

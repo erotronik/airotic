@@ -1,3 +1,5 @@
+#ifndef ESP32
+
 BLEUart bleuart;
 #include "coyote.h"
 
@@ -234,3 +236,11 @@ void btAndSerialPrintf(const char* format, ...) {
 
   delete(buffer);
 }
+
+#else
+
+void comms_init(short myid) {
+//  BLE.begin();
+}
+
+#endif

@@ -38,7 +38,10 @@
 #define DISTANCE_TO_SYNC_LEDS 64
 
 #include <FastLED.h>
+#include <Adafruit_NeoPixel.h>
+#ifndef ESP32
 #include <bluefruit.h>
+#endif
 
 #define MAX_BOTTLES 16
 typedef struct {
@@ -52,7 +55,16 @@ typedef struct {
 bottle_t seen_bottles[MAX_BOTTLES];
 
 #define NUM_LEDS 2
-CRGB leds[NUM_LEDS];
+#ifndef ESP32
+// ItsyBitsy has level-shift on pin 5
+#define LED_DATA_PIN 5
+#else
+// On ESP32, use A0
+#define LED_DATA_PIN 4
+#endif
+#define PIXEL_TYPE NEO_RGBW + NEO_KHZ800
+
+Adafruit_NeoPixel px = Adafruit_NeoPixel(NUM_LEDS, LED_DATA_PIN, PIXEL_TYPE);
 
 CHSV colorTargetDefault = CHSV(160, 255, 255); // blue is 160, green is 96
 CHSV colorStartDefault = CHSV(224, 255, 255); // purple is 192, red is 0
@@ -74,19 +86,29 @@ int nearest_bottle_percent = 100;
 // set this via bluetooth, 1==bluetooth send the bmp sensor read and average
 short debug_mode = 0;
 
+
 void leds_setup() {
   // "Boot" mode
-  FastLED.addLeds<NEOPIXEL, 5>(leds, NUM_LEDS);
-  FastLED.setBrightness(255);
-  leds[0] = CRGB::White;
-  leds[1] = CRGB::White;
-  FastLED.show();
+  px.begin();
+  px.setBrightness(255);
+  px.setPixelColor(0, 255, 255, 255);
+  px.setPixelColor(1, 255, 255, 255);
+  px.show();
+
+  //FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds, NUM_LEDS);
+  //FastLED.setBrightness(255);
+  //leds[0] = CRGB::White;
+  //leds[1] = CRGB::White;
+  //FastLED.show();
 }
 
 void leds_startingstate() {
   colorCurrent = colorMyTarget;
-  fill_solid( leds, NUM_LEDS, colorCurrent );
-  FastLED.show();
+  //fill_solid( leds, NUM_LEDS, colorCurrent );
+  //FastLED.show();
+  CRGB rgbcolor = colorCurrent;
+  px.fill( px.Color(rgbcolor.r, rgbcolor.g, rgbcolor. b), 0, NUM_LEDS );
+  px.show();
 }
 
 void leds_do_fade() {
@@ -94,8 +116,11 @@ void leds_do_fade() {
   if ( colorCurrent.h != colorTarget.h ) {
     fade = min(fade + fadespeed, 255);
     colorCurrent = blend(colorWas, colorTarget, fade, SHORTEST_HUES);
-    fill_solid( leds, NUM_LEDS, colorCurrent );
-    FastLED.show();
+    CRGB rgbcolor = colorCurrent;
+    //fill_solid( leds, NUM_LEDS, colorCurrent );
+    //FastLED.show();
+    px.fill( px.Color(rgbcolor.r, rgbcolor.g, rgbcolor.b), 0, NUM_LEDS);
+    px.show();
   }
 }
 
@@ -114,18 +139,18 @@ void check_breath() {
     blow_state = 1;
     fade = 0;
     // fade, but slow while the breath is happening
-    comms_send_breath(true);
+    //comms_send_breath(true);
     fadespeed = 4;
     colorCurrent = colorStart;
     colorWas = colorStart;
   } else if (blow_state == 1 && pread > avg) {
     blow_state = 0;
-    comms_send_breath(false);
+    //comms_send_breath(false);
     // fade back faster now the breath has 'stopped'
     fadespeed = 16;
   }
-  if (debug_mode & 1) comms_uart_send_graph(pread, avg);
-  //Serial.printf("%d,%d,%d\n",pread,avg,avg-avthres);
+  //if (debug_mode & 1) comms_uart_send_graph(pread, avg);
+  Serial.printf("%d,%d,%d\n",pread,avg,avg-avthres);
   avg = (avg * 8 + pread * 2) / 10;
 
 }
@@ -149,6 +174,7 @@ void debug_checkcodespeed() {
   }
 }
 
+/*
 void look_for_close_bottles() {
   //
   // Any other Bottles close?  "Merge" colours if 2, Fixed colour if 3
@@ -197,6 +223,9 @@ void look_for_close_bottles() {
   } // otherwise n==1 use the one we found above.
 }
 
+*/
+
+/*
 void bottle_setup() {
   // MAX_BOTTLES green bottles, sitting on a wall...
   for (short i = 0; i < MAX_BOTTLES; i++) {
@@ -204,28 +233,30 @@ void bottle_setup() {
     seen_bottles[i].changed_state = false;
   }
 }
+*/
 
 // Main Entry Points are Below
 
 void setup() {
   Serial.begin(115200);
-  bottle_setup();
+  //bottle_setup();
   leds_setup();
   delay(1500);
   airsensor_setup();
   avg = airsensor_read();
-  storage_setup();
+  //storage_setup();
   leds_startingstate();
   comms_init(bottle_number);
   Serial.printf("I am bottle number %d\n", bottle_number);
 }
 
 void loop() {
-  comms_uart_colorpicker();
-  debug_checkcodespeed();
+  //comms_uart_colorpicker();
+  //debug_checkcodespeed();
   check_breath();
-  comms_check_distance(DISTANCE_TO_SYNC_LEDS);
-  look_for_close_bottles();
+  //comms_check_distance(DISTANCE_TO_SYNC_LEDS);
+  //look_for_close_bottles();
   leds_do_fade();
   delay(100);
+  Serial.printf("Main loop\n");
 }
