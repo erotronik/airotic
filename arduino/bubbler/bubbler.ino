@@ -39,6 +39,12 @@
 
 #include <FastLED.h>
 #include <Adafruit_NeoPixel.h>
+
+#ifdef ESP32
+#include <WiFi.h>
+#include <AsyncMqtt_Generic.h>
+#endif
+
 #ifndef ESP32
 #include <bluefruit.h>
 #endif
@@ -62,7 +68,7 @@ bottle_t seen_bottles[MAX_BOTTLES];
 // On ESP32, use A0
 #define LED_DATA_PIN 4
 #endif
-#define PIXEL_TYPE NEO_RGBW + NEO_KHZ800
+#define PIXEL_TYPE NEO_GRBW + NEO_KHZ800
 
 Adafruit_NeoPixel px = Adafruit_NeoPixel(NUM_LEDS, LED_DATA_PIN, PIXEL_TYPE);
 
@@ -140,17 +146,19 @@ void check_breath() {
     fade = 0;
     // fade, but slow while the breath is happening
     //comms_send_breath(true);
+    wifi_send_breath(true);
     fadespeed = 4;
     colorCurrent = colorStart;
     colorWas = colorStart;
   } else if (blow_state == 1 && pread > avg) {
     blow_state = 0;
     //comms_send_breath(false);
+    wifi_send_breath(false);
     // fade back faster now the breath has 'stopped'
     fadespeed = 16;
   }
   //if (debug_mode & 1) comms_uart_send_graph(pread, avg);
-  Serial.printf("%d,%d,%d\n",pread,avg,avg-avthres);
+  //Serial.printf("%d,%d,%d\n",pread,avg,avg-avthres);
   avg = (avg * 8 + pread * 2) / 10;
 
 }
@@ -244,7 +252,8 @@ void setup() {
   delay(1500);
   airsensor_setup();
   avg = airsensor_read();
-  //storage_setup();
+  storage_setup();
+  wifi_setup();
   leds_startingstate();
   comms_init(bottle_number);
   Serial.printf("I am bottle number %d\n", bottle_number);
@@ -258,5 +267,4 @@ void loop() {
   //look_for_close_bottles();
   leds_do_fade();
   delay(100);
-  Serial.printf("Main loop\n");
 }

@@ -51,8 +51,21 @@ void storage_setup() {
 
 #else
 
+// on ESP32 we use LittleFS
+
 #include <Arduino.h>
 #include "FS.h"
 #include <LittleFS.h>
+
+#define FORMAT_LITTLEFS_IF_FAILED true
+
+void storage_setup() {
+  if(!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)){
+    Serial.println("LittleFS Mount Failed");
+    return;
+  }
+  Serial.println("LittleFS Mount Succeeded");
+  LittleFS.end();
+}
 
 #endif
