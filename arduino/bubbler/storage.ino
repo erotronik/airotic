@@ -57,7 +57,16 @@ void storage_setup() {
 #include "FS.h"
 #include <LittleFS.h>
 
+#define flashfile_FILENAME "/x0.txt"
+
 #define FORMAT_LITTLEFS_IF_FAILED true
+
+struct data_format {
+  int version = 1;
+  CHSV colorTarget;
+  CHSV colorStart;
+  short bottle_number;
+};
 
 void storage_setup() {
   if(!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)){
@@ -65,6 +74,57 @@ void storage_setup() {
     return;
   }
   Serial.println("LittleFS Mount Succeeded");
+
+  data_format df;
+
+  File data = LittleFS.open(flashfile_FILENAME);
+  if (data && !data.isDirectory()) {
+    Serial.println("Reading from storage");
+    auto read = data.read((uint8_t*)&df, sizeof(df));
+    if (read != sizeof(df)) {
+      Serial.println("Storage read failed");
+      return;
+    }
+    if (df.version != 1) {
+      Serial.println("Invalid data format version");
+      return;
+    }
+    bottle_number = df.bottle_number;
+    colorTarget = df.colorTarget;
+    colorStart = df.colorStart;
+    data.close();
+  } else {
+    storage_write();
+    Serial.println("set defaults, now resetting");
+    LittleFS.end();
+    delay(1000);
+    ESP.restart();
+  }
+  LittleFS.end();
+}
+
+void storage_write() {
+  if(!LittleFS.begin(false)){
+    Serial.println("LittleFS Mount Failed");
+    return;
+  }
+  auto flashfile = LittleFS.open(flashfile_FILENAME, FILE_WRITE, true);
+  if (!flashfile) {
+    Serial.println("Could not open file for writing");
+    return;
+  }
+  Serial.println("Writing to storage");
+  data_format df;
+  df.bottle_number = bottle_number;
+  df.colorTarget = colorTarget;
+  df.colorStart = colorStart;
+  auto written = flashfile.write((uint8_t*)&df, sizeof(df));
+  if (written != sizeof(df)) {
+    Serial.println("Number of written bytes incorrect");
+    return;
+  }
+  flashfile.flush();
+  flashfile.close();
   LittleFS.end();
 }
 

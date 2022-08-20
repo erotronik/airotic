@@ -41,8 +41,10 @@
 #include <Adafruit_NeoPixel.h>
 
 #ifdef ESP32
+#ifdef ENABLE_WIFI
 #include <WiFi.h>
 #include <AsyncMqtt_Generic.h>
+#endif
 #endif
 
 #ifndef ESP32
@@ -96,7 +98,7 @@ short debug_mode = 0;
 void leds_setup() {
   // "Boot" mode
   px.begin();
-  px.setBrightness(255);
+  px.setBrightness(70);
   px.setPixelColor(0, 255, 255, 255);
   px.setPixelColor(1, 255, 255, 255);
   px.show();
@@ -146,14 +148,22 @@ void check_breath() {
     fade = 0;
     // fade, but slow while the breath is happening
     //comms_send_breath(true);
+#ifdef ESP32
+#ifdef ENABLE_WIFI
     wifi_send_breath(true);
+#endif
+#endif
     fadespeed = 4;
     colorCurrent = colorStart;
     colorWas = colorStart;
   } else if (blow_state == 1 && pread > avg) {
     blow_state = 0;
     //comms_send_breath(false);
+#ifdef ESP32
+#ifdef ENABLE_WIFI
     wifi_send_breath(false);
+#endif
+#endif
     // fade back faster now the breath has 'stopped'
     fadespeed = 16;
   }
@@ -233,7 +243,6 @@ void look_for_close_bottles() {
 
 */
 
-/*
 void bottle_setup() {
   // MAX_BOTTLES green bottles, sitting on a wall...
   for (short i = 0; i < MAX_BOTTLES; i++) {
@@ -241,27 +250,30 @@ void bottle_setup() {
     seen_bottles[i].changed_state = false;
   }
 }
-*/
 
 // Main Entry Points are Below
 
 void setup() {
   Serial.begin(115200);
-  //bottle_setup();
+  bottle_setup();
   leds_setup();
   delay(1500);
   airsensor_setup();
   avg = airsensor_read();
   storage_setup();
+#ifdef ESP32
+#ifdef ENABLE_WIFI
   wifi_setup();
+#endif
+#endif
   leds_startingstate();
   comms_init(bottle_number);
   Serial.printf("I am bottle number %d\n", bottle_number);
 }
 
 void loop() {
-  //comms_uart_colorpicker();
-  //debug_checkcodespeed();
+  comms_uart_colorpicker();
+  debug_checkcodespeed();
   check_breath();
   //comms_check_distance(DISTANCE_TO_SYNC_LEDS);
   //look_for_close_bottles();

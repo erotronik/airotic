@@ -1,11 +1,12 @@
-#ifndef ESP32
-
-BLEUart bleuart;
-#include "coyote.h"
 
 // https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers steal a name nothing over 0x1000 is used anyway
 #define our_fake_company_id0 0xf1
 #define our_fake_company_id1 0xf1
+
+#ifndef ESP32
+
+BLEUart bleuart;
+#include "coyote.h"
 
 void comms_init(short myid) {
   char buf[15];
@@ -66,129 +67,6 @@ void comms_connect_callback(uint16_t conn_handle)
   btAndSerialPrintf("Connected to %s",central_name);
 }
 
-void comms_send_breath(boolean b) {
-  btAndSerialPrintf("*%c\n",b?'B':'R');
-  coyote_cb(b);
-}
-
-void comms_uart_send_bottles() {
-  if (millis() / 100 % 5 != 0) return;
-
-  for (short i = 0; i < MAX_BOTTLES; i++) {
-     if (seen_bottles[i].rssi_av<128) {
-       btAndSerialPrintf("%d\r\n",seen_bottles[i].rssi_av);
-     }
-  }
-}
-
-boolean comms_uart_send_graph(int pread, int avg) {
-  btAndSerialPrintf("%d,%d\r\n",pread,avg);
-  return true;
-}
-
-short last_button = 0;
-
-void comms_uart_colorpicker(void) {
-  boolean bt = false;
-  // Respond to the Adafruit client so we don't need to bother to write one, plus extra commands
-  //
-  // !C[RGB] - set color of LED selected by below
-  // !B1 - LED to change is the target (default)
-  // !B2 - LED to change is the start
-  // !B3 - Use default LEDs
-  // !B4 - reboot after setting options so we advertise correctly
-  // !S[0-9][0-9] - Set bottle ID
-  // !D[0-9] - Debug mode (&1 is "breath sensor graph")(&2 is "rssid")
-  //
-  
-  if ( Bluefruit.connected() && bleuart.notifyEnabled() ) 
-    bt = true;
-  if (!bt && Serial.available()<1)
-    return;
-
-  int command = bt?bleuart.read():Serial.read();
-  if (command != '!') 
-     return;
-     
-  command = bt?bleuart.read():Serial.read();
-  if (command == 'H') {
-      btAndSerialPrintf("*Hello I am bottle %d\n", bottle_number);  
-  }
-  else if (command == 'C') {
-    uint8_t r = bt?bleuart.read():Serial.read(); // TODO: might want to do this different for serial
-    uint8_t g = bt?bleuart.read():Serial.read();
-    uint8_t b = bt?bleuart.read():Serial.read();
-    CRGB x = CRGB(r, g, b);
-    if (last_button == 0 || last_button == 1) {
-      colorTarget = rgb2hsv_approximate(x);
-      colorMyTarget = colorTarget;
-      fill_solid( leds, NUM_LEDS, colorTarget );
-      FastLED.show();        
-    } else if (last_button == 2) {          
-      colorStart = rgb2hsv_approximate(x);
-      colorMyStart = colorStart;
-      fill_solid( leds, NUM_LEDS, colorStart );
-      FastLED.show();           
-    }
-    storage_write();
-  } else if (command == 'B') {
-    command = bt?bleuart.read():Serial.read();
-    if (command == '4') {
-      btAndSerialPrintf("rebooting\n");
-      delay(100);
-      NVIC_SystemReset();
-    }
-    last_button = command - '0';
-    if (last_button == 3) {
-      colorTarget = colorTargetDefault;
-      colorStart = colorStartDefault;
-      storage_write();
-      btAndSerialPrintf("ok\n");
-    }
-  } else if (command == 'S') {
-    command = bt?bleuart.read():Serial.read();
-    bottle_number = (command - '0')*10;
-    command = bt?bleuart.read():Serial.read();
-    bottle_number += (command - '0');        
-    if (bottle_number < MAX_BOTTLES) {
-      storage_write();
-      btAndSerialPrintf("ok, set, rebooting\n");
-      delay(100);
-      NVIC_SystemReset();          
-    } else {
-      btAndSerialPrintf("bad number\n");
-    }
-  } else if (command == 'D') {
-    command = bt?bleuart.read():Serial.read();
-    debug_mode = command - '0';
-    btAndSerialPrintf("ok\n");
-  }
-}
-
-long rssi_last = 128;
-
-void comms_check_distance(int distance) {
-  //
-  // not seen for more than 10 seconds? set rssid to 128
-  //
-  for (short i = 0; i < MAX_BOTTLES; i++) {
-    if (seen_bottles[i].rssi_av != 128 && (millis() - seen_bottles[i].rssi_last > 10000)) {
-      seen_bottles[i].rssi_av = 128;
-      btAndSerialPrintf("Bottle %d has departed\n", i);
-    }
-    if (seen_bottles[i].rssi_av <= distance && seen_bottles[i].state == 0) {
-      btAndSerialPrintf("Bottle %d is close %d\n", i, seen_bottles[i].rssi_av);
-      seen_bottles[i].state = 1;
-      seen_bottles[i].changed_state = true;
-    }
-    if (seen_bottles[i].rssi_av >= (distance + 6) && seen_bottles[i].state == 1) {
-      btAndSerialPrintf("Bottle %d is away %d\n", i, seen_bottles[i].rssi_av);
-      seen_bottles[i].state = 0;
-      seen_bottles[i].changed_state = true;
-    }
-  }
-}
-
 void scan_callback(ble_gap_evt_adv_report_t *report)
 {
   uint8_t buffer[32];
@@ -219,6 +97,256 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
   Bluefruit.Scanner.resume();
 }
 
+#else /* ESP32 */
+
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+BLEServer *pServer = NULL;
+BLECharacteristic * pTxCharacteristic;
+bool device_connected = false;
+
+#define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E" // UART service UUID
+#define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+#define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+
+class BubblerServerCallbacks: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+      Serial.println("Device connected");
+      device_connected = true;
+    };
+
+    void onDisconnect(BLEServer* pServer) {
+      Serial.println("Device disconnected");
+      device_connected = false;
+      // we need to manually restart advertising
+      pServer->getAdvertising()->start();
+    }
+};
+
+class BubblerCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string rxValue = pCharacteristic->getValue();
+
+      if (rxValue.length() > 0)
+        buffer.append(rxValue);
+    }
+
+public:
+    bool has_data() {
+      return !buffer.empty();
+    }
+
+    int get_char() {
+      if (buffer.empty())
+        return 0;
+
+      int out = buffer[0];
+      buffer.erase(0,1);
+      return out;
+    }
+
+    std::string buffer;
+};
+
+BubblerCallbacks callbacks;
+
+void comms_init(short myid) {
+  char buf[15];
+  snprintf(buf, 15, "Air%02d", myid);
+  BLEDevice::init(buf);
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new BubblerServerCallbacks());
+  comms_start_adv();
+}
+
+
+void comms_start_adv(void) {
+  // Create the BLE Service
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  // Create a BLE Characteristic
+  pTxCharacteristic = pService->createCharacteristic(
+                    CHARACTERISTIC_UUID_TX,
+                    BLECharacteristic::PROPERTY_NOTIFY
+                  );
+
+  pTxCharacteristic->addDescriptor(new BLE2902());
+
+  BLECharacteristic * pRxCharacteristic = pService->createCharacteristic(
+                       CHARACTERISTIC_UUID_RX,
+                      BLECharacteristic::PROPERTY_WRITE
+                    );
+
+  pRxCharacteristic->setCallbacks(&callbacks);
+
+  // Start the service
+  pService->start();
+
+  // Start advertising
+  pServer->getAdvertising()->start();
+}
+
+#endif
+
+void comms_send_breath(boolean b) {
+  btAndSerialPrintf("*%c\n",b?'B':'R');
+#ifndef ESP32
+  coyote_cb(b);
+#endif
+}
+
+void comms_uart_send_bottles() {
+  if (millis() / 100 % 5 != 0) return;
+
+  for (short i = 0; i < MAX_BOTTLES; i++) {
+     if (seen_bottles[i].rssi_av<128) {
+       btAndSerialPrintf("%d\r\n",seen_bottles[i].rssi_av);
+     }
+  }
+}
+
+boolean comms_uart_send_graph(int pread, int avg) {
+  btAndSerialPrintf("%d,%d\r\n",pread,avg);
+  return true;
+}
+
+short last_button = 0;
+
+bool bluetooth_available() {
+#ifndef ESP32
+  return Bluefruit.connected() && bleuart.notifyEnabled();
+#else
+  return callbacks.has_data();
+#endif
+}
+
+int bluetooth_read() {
+#ifndef ESP32
+  return bleuart.read();
+#else
+  auto data = callbacks.get_char();
+  Serial.printf("Got: %c\n", data);
+  return data;
+#endif
+}
+
+void comms_uart_colorpicker(void) {
+  boolean bt = false;
+  // Respond to the Adafruit client so we don't need to bother to write one, plus extra commands
+  //
+  // !C[RGB] - set color of LED selected by below
+  // !B1 - LED to change is the target (default)
+  // !B2 - LED to change is the start
+  // !B3 - Use default LEDs
+  // !B4 - reboot after setting options so we advertise correctly
+  // !S[0-9][0-9] - Set bottle ID
+  // !D[0-9] - Debug mode (&1 is "breath sensor graph")(&2 is "rssid")
+  //
+  bt = bluetooth_available();
+  if (!bt && Serial.available()<1)
+    return;
+
+  Serial.println("Got something");
+
+  int command = bt?bluetooth_read():Serial.read();
+  if (command != '!')
+     return;
+
+  command = bt?bluetooth_read():Serial.read();
+  if (command == 'H') {
+      btAndSerialPrintf("*Hello I am bottle %d\n", bottle_number);
+  }
+  else if (command == 'C') {
+    uint8_t r = bt?bluetooth_read():Serial.read(); // TODO: might want to do this different for serial
+    uint8_t g = bt?bluetooth_read():Serial.read();
+    uint8_t b = bt?bluetooth_read():Serial.read();
+    CRGB x = CRGB(r, g, b);
+    if (last_button == 0 || last_button == 1) {
+      colorTarget = rgb2hsv_approximate(x);
+      colorMyTarget = colorTarget;
+      px.fill( px.Color(x.r, x.g, x.b), 0, NUM_LEDS );
+      px.show();
+      //fill_solid( leds, NUM_LEDS, colorTarget );
+      //FastLED.show();
+    } else if (last_button == 2) {
+      colorStart = rgb2hsv_approximate(x);
+      colorMyStart = colorStart;
+      CRGB start = colorStart;
+      px.fill( px.Color(start.r, start.g, start.b), 0, NUM_LEDS );
+      px.show();
+      //fill_solid( leds, NUM_LEDS, colorStart );
+      //FastLED.show();
+    }
+    storage_write();
+  } else if (command == 'B') {
+    command = bt?bluetooth_read():Serial.read();
+    if (command == '4') {
+      btAndSerialPrintf("rebooting\n");
+      delay(100);
+#ifndef ESP32
+      NVIC_SystemReset();
+#else
+      ESP.restart();
+#endif
+    }
+    last_button = command - '0';
+    if (last_button == 3) {
+      colorTarget = colorTargetDefault;
+      colorStart = colorStartDefault;
+      storage_write();
+      btAndSerialPrintf("ok\n");
+    }
+  } else if (command == 'S') {
+    command = bt?bluetooth_read():Serial.read();
+    bottle_number = (command - '0')*10;
+    command = bt?bluetooth_read():Serial.read();
+    bottle_number += (command - '0');
+    if (bottle_number < MAX_BOTTLES) {
+      storage_write();
+      btAndSerialPrintf("ok, set, rebooting\n");
+      delay(100);
+#ifndef ESP32
+      NVIC_SystemReset();
+#else
+      ESP.restart();
+#endif;
+    } else {
+      btAndSerialPrintf("bad number\n");
+    }
+  } else if (command == 'D') {
+    command = bt?bluetooth_read():Serial.read();
+    debug_mode = command - '0';
+    btAndSerialPrintf("ok\n");
+  }
+}
+
+long rssi_last = 128;
+
+void comms_check_distance(int distance) {
+  //
+  // not seen for more than 10 seconds? set rssid to 128
+  //
+  for (short i = 0; i < MAX_BOTTLES; i++) {
+    if (seen_bottles[i].rssi_av != 128 && (millis() - seen_bottles[i].rssi_last > 10000)) {
+      seen_bottles[i].rssi_av = 128;
+      btAndSerialPrintf("Bottle %d has departed\n", i);
+    }
+    if (seen_bottles[i].rssi_av <= distance && seen_bottles[i].state == 0) {
+      btAndSerialPrintf("Bottle %d is close %d\n", i, seen_bottles[i].rssi_av);
+      seen_bottles[i].state = 1;
+      seen_bottles[i].changed_state = true;
+    }
+    if (seen_bottles[i].rssi_av >= (distance + 6) && seen_bottles[i].state == 1) {
+      btAndSerialPrintf("Bottle %d is away %d\n", i, seen_bottles[i].rssi_av);
+      seen_bottles[i].state = 0;
+      seen_bottles[i].changed_state = true;
+    }
+  }
+}
+
 void btAndSerialPrintf(const char* format, ...) {
   va_list args;
   va_start(args, format);
@@ -228,19 +356,19 @@ void btAndSerialPrintf(const char* format, ...) {
 
   vsnprintf(buffer, bufferSize, format, args);
 
-  if (Bluefruit.connected()) 
+#ifndef ESP32
+  if (Bluefruit.connected())
       bleuart.print(buffer);
+#else
+  if (device_connected) {
+    pTxCharacteristic->setValue((uint8_t*)buffer, strlen(buffer));
+    pTxCharacteristic->notify();
+  }
+#endif
+
   Serial.print(buffer);
 
   va_end(args);
 
   delete(buffer);
 }
-
-#else
-
-void comms_init(short myid) {
-//  BLE.begin();
-}
-
-#endif

@@ -1,4 +1,5 @@
 #ifdef ESP32
+#ifdef ENABLE_WIFI
 
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -108,4 +109,5 @@ void wifi_setup() {
   wimu.run();
 }
 
+#endif
 #endif
