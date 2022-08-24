@@ -1,12 +1,12 @@
-
 // https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers steal a name nothing over 0x1000 is used anyway
 #define our_fake_company_id0 0xf1
 #define our_fake_company_id1 0xf1
 
+#include "coyote.h"
+
 #ifndef ESP32
 
 BLEUart bleuart;
-#include "coyote.h"
 
 void comms_init(short myid) {
   char buf[15];
@@ -72,28 +72,11 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
   uint8_t buffer[32];
   uint8_t len = Bluefruit.Scanner.parseReportByType(report, BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA, buffer, sizeof(buffer));
 
-  if (len > 2 && buffer[1] == 0x19 && buffer[0] == 0x96) {
-    //
-    // Found a Coyote
-    //
-    btAndSerialPrintf("Found DG-LAB\n");
+  auto res = check_scan_data(std::string((char*)buffer, len), report->rssi);
+
+  if ( res == Coyote )
     Bluefruit.Central.connect(report);
-  } else if (len > 2 && buffer[1] == our_fake_company_id1 && buffer[0] == our_fake_company_id0) {
-    //
-    // Found a Bottle
-    //
-    short bottleno = buffer[2] & 0xf;
-    if (bottleno&1 == 1) {  // we only look at odd id bottles
-      if (seen_bottles[bottleno].rssi_av == 128) {
-        btAndSerialPrintf("How do you do fellow bottle #%d (%d)\n", bottleno, 0 - report->rssi);
-        seen_bottles[bottleno].rssi_av = 0 - report->rssi;
-        seen_bottles[bottleno].colorTarget = CHSV(buffer[3], buffer[4], 255);
-        seen_bottles[bottleno].colorStart = CHSV(buffer[5], buffer[6], 255);
-      }
-      seen_bottles[bottleno].rssi_av = (seen_bottles[bottleno].rssi_av * 7 + (0 - report->rssi) * 3) / 10;
-      seen_bottles[bottleno].rssi_last = millis();
-    }
-  }
+
   Bluefruit.Scanner.resume();
 }
 
@@ -102,11 +85,14 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
+#include <BLEAdvertisedDevice.h>
 #include <BLE2902.h>
 
 BLEServer *pServer = NULL;
 BLECharacteristic * pTxCharacteristic;
 bool device_connected = false;
+BLEScan* pBLEScan;
+int scanTime = 5; //In seconds
 
 #define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E" // UART service UUID
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -151,17 +137,58 @@ public:
     std::string buffer;
 };
 
+bool client_connected = false;
+BLEAdvertisedDevice* coyote_device = nullptr;
+
+
+class BubblerAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
+    void onResult(BLEAdvertisedDevice advertisedDevice) {
+      Serial.printf("Advertised Device: %s \n", advertisedDevice.toString().c_str());
+      auto res = check_scan_data(advertisedDevice.getManufacturerData(), advertisedDevice.getRSSI());
+      if ( res == Coyote ) {
+        // can't connect while scanning is going on - it locks up everything.
+        coyote_device = new BLEAdvertisedDevice(advertisedDevice);
+        BLEDevice::getScan()->stop();
+      }
+    }
+};
+
 BubblerCallbacks callbacks;
 
 void comms_init(short myid) {
   char buf[15];
   snprintf(buf, 15, "Air%02d", myid);
   BLEDevice::init(buf);
+  // BLEDevice::setPower(ESP_PWR_LVL_P9);
+
+  pBLEScan = BLEDevice::getScan(); //create new scan
+  pBLEScan->setAdvertisedDeviceCallbacks(new BubblerAdvertisedDeviceCallbacks());
+  pBLEScan->setActiveScan(false); //active scan uses more power, but get results faster
+  pBLEScan->setInterval(2000);
+  pBLEScan->setWindow(2000);  // less or equal setInterval value
+
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new BubblerServerCallbacks());
   comms_start_adv();
+  coyote_setup();
 }
 
+void scan_loop() {
+  if ( !client_connected ) {
+    BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
+    Serial.print("Devices found: ");
+    Serial.println(foundDevices.getCount());
+    Serial.println("Scan done!");
+    pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
+    delay(2000);
+
+    if ( coyote_device ) {
+      connect_to_coyote(coyote_device);
+      delete coyote_device;
+      coyote_device = nullptr;      
+    }
+  }
+}
 
 void comms_start_adv(void) {
   // Create the BLE Service
@@ -321,6 +348,33 @@ void comms_uart_colorpicker(void) {
     debug_mode = command - '0';
     btAndSerialPrintf("ok\n");
   }
+}
+
+enum scan_callback_result check_scan_data(std::string ble_manufacturer_specific_data, int rssi) {
+  if (ble_manufacturer_specific_data.length() > 2 && ble_manufacturer_specific_data[1] == 0x19 && ble_manufacturer_specific_data[0] == 0x96) {
+    //
+    // Found a Coyote
+    //
+    btAndSerialPrintf("Found DG-LAB\n");
+    return Coyote;
+  } else if (ble_manufacturer_specific_data.length() > 2 && ble_manufacturer_specific_data[1] == our_fake_company_id1 && ble_manufacturer_specific_data[0] == our_fake_company_id0) {
+    //
+    // Found a Bottle
+    //
+    short bottleno = ble_manufacturer_specific_data[2] & 0xf;
+    if (bottleno&1 == 1) {  // we only look at odd id bottles
+      if (seen_bottles[bottleno].rssi_av == 128) {
+        btAndSerialPrintf("How do you do fellow bottle #%d (%d)\n", bottleno, 0 - rssi);
+        seen_bottles[bottleno].rssi_av = 0 - rssi;
+        seen_bottles[bottleno].colorTarget = CHSV(ble_manufacturer_specific_data[3], ble_manufacturer_specific_data[4], 255);
+        seen_bottles[bottleno].colorStart = CHSV(ble_manufacturer_specific_data[5], ble_manufacturer_specific_data[6], 255);
+      }
+      seen_bottles[bottleno].rssi_av = (seen_bottles[bottleno].rssi_av * 7 + (0 - rssi) * 3) / 10;
+      seen_bottles[bottleno].rssi_last = millis();
+    }
+    return Bottle;
+  }
+  return None;
 }
 
 long rssi_last = 128;

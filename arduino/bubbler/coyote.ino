@@ -1,5 +1,3 @@
-#ifndef ESP32
-
 // References:
 // https://rezreal.github.io/coyote/web-bluetooth-example.html
 // https://github.com/OpenDGLab/OpenDGLab-Connect/blob/master/src/services/DGLab.js
@@ -11,6 +9,121 @@ uint8_t A_CHAR_UUID[] = {0xad, 0xe8, 0xf3, 0xd4, 0xb8, 0x84, 0x94, 0xa0, 0xaa, 0
 uint8_t B_CHAR_UUID[] = {0xad, 0xe8, 0xf3, 0xd4, 0xb8, 0x84, 0x94, 0xa0, 0xaa, 0xf5, 0xe2, 0x0f, 0x05, 0x15, 0x5a, 0x95};
 uint8_t BATTERY_UUID[] = {0xad, 0xe8, 0xf3, 0xd4, 0xb8, 0x84, 0x94, 0xa0, 0xaa, 0xf5, 0xe2, 0x0f, 0x0a, 0x18, 0x5a, 0x95};
 uint8_t BATTERY_CHAR_UUID[] = {0xad, 0xe8, 0xf3, 0xd4, 0xb8, 0x84, 0x94, 0xa0, 0xaa, 0xf5, 0xe2, 0x0f, 0x00, 0x15, 0x5a, 0x95};
+
+#ifdef ESP32
+
+#include "BLEDevice.h"
+
+static BLEUUID COYOTE_SERVICE_BLEUUID(COYOTE_SERVICE_UUID, 16, false);
+static BLEUUID CONFIG_CHAR_BLEUUID(CONFIG_CHAR_UUID, 16, false);
+static BLEUUID POWER_CHAR_BLEUUID(POWER_CHAR_UUID, 16, false);
+static BLEUUID A_CHAR_BLEUUID(A_CHAR_UUID, 16, false);
+static BLEUUID B_CHAR_BLEUUID(B_CHAR_UUID, 16, false);
+static BLEUUID BATTERY_BLEUUID(BATTERY_UUID, 16, false);
+static BLEUUID BATTERY_CHAR_BLEUUID(BATTERY_CHAR_UUID, 16, false);
+
+BLEClient* pClient;
+
+class BubblerClientCallback : public BLEClientCallbacks {
+  void onConnect(BLEClient* pclient) {
+    Serial.println("Client onConnect");
+  }
+
+  void onDisconnect(BLEClient* pclient) {
+    client_connected = false;
+    Serial.println("Client onDisconnect");
+  }
+};
+
+static void bubbler_notify_callback(
+  BLERemoteCharacteristic* pBLERemoteCharacteristic,
+  uint8_t* pData,
+  size_t length,
+  bool isNotify) {
+    Serial.print("Notify callback for characteristic ");
+    Serial.print(pBLERemoteCharacteristic->getUUID().toString().c_str());
+    Serial.print(" of data length ");
+    Serial.println(length);
+    Serial.print("data: ");
+    Serial.println((char*)pData);
+}
+
+void coyote_setup(void) {
+  Serial.println("Creating BLE client");
+
+
+}
+
+bool connect_to_coyote(BLEAdvertisedDevice* coyote_device) {
+  static BLERemoteCharacteristic* pRemoteCharacteristic;
+
+  pClient = BLEDevice::createClient();
+  pClient->setClientCallbacks(new BubblerClientCallback());
+
+  if ( client_connected )
+    return false;
+
+  Serial.printf("Will try to connect to Coyote at %s\n", coyote_device->getAddress().toString().c_str());
+  if ( !pClient->connect(coyote_device) ) {
+    Serial.println("Connection failed");
+    return false;
+  }
+  Serial.println("Connection established");
+  //pClient->setMTU(517); //set client to request maximum MTU from server (default is 23 otherwise)
+
+  /* Serial.println("Trying to list services...");
+  std::map<std::string, BLERemoteService*>* services = pClient->getServices();
+  if ( !services ) {
+    Serial.println("No services");
+    return false;   
+  }
+  for ( const auto& service : *services ) {
+    Serial.printf("%s: %s\n", service.first.c_str(), service.second->toString().c_str());
+  }
+  Serial.println("Done");
+*/
+
+  BLERemoteService* pRemoteService = pClient->getService(COYOTE_SERVICE_BLEUUID);
+  if (pRemoteService == nullptr) {
+    Serial.print("Failed to find our service UUID: ");
+    Serial.println(COYOTE_SERVICE_BLEUUID.toString().c_str());
+    pClient->disconnect();
+    return false;
+  }
+  Serial.println("Found our service");
+
+  pRemoteCharacteristic = pRemoteService->getCharacteristic(CONFIG_CHAR_BLEUUID);
+  if (pRemoteCharacteristic == nullptr) {
+    Serial.print("Failed to find our characteristic UUID: ");
+    Serial.println(CONFIG_CHAR_BLEUUID.toString().c_str());
+    pClient->disconnect();
+    return false;
+  }
+  Serial.println(" - Found our characteristic");
+
+  // Read the value of the characteristic.
+  if(pRemoteCharacteristic->canRead()) {
+    std::string value = pRemoteCharacteristic->readValue();
+    Serial.print("The characteristic value was: ");
+    Serial.println(value.c_str());
+    coyote_maxPower = (value[2] & 0xf) * 256 + value[1];
+    coyote_powerStep = value[0];
+    Serial.printf("coyote maxPower: %d\n", coyote_maxPower);
+    Serial.printf("coyote powerStep: %d\n", coyote_powerStep);    
+  }
+
+  if(pRemoteCharacteristic->canNotify()) {
+    Serial.println("Registered for callback");
+    pRemoteCharacteristic->registerForNotify(bubbler_notify_callback);
+  }
+
+  client_connected = true;
+  return true;
+}
+
+#endif /* ESP32 */
+
+#ifndef ESP32
 
 BLEClientService coyoteService(COYOTE_SERVICE_UUID);
 BLEClientCharacteristic configCharacteristic(CONFIG_CHAR_UUID);

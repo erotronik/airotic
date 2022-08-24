@@ -41,11 +41,12 @@
 #include <Adafruit_NeoPixel.h>
 
 #ifdef ESP32
+#include "BLEDevice.h"
 #ifdef ENABLE_WIFI
 #include <WiFi.h>
 #include <AsyncMqtt_Generic.h>
-#endif
-#endif
+#endif /* ENABLE_WIFI */ 
+#endif /* ESP32 */
 
 #ifndef ESP32
 #include <bluefruit.h>
@@ -94,11 +95,13 @@ int nearest_bottle_percent = 100;
 // set this via bluetooth, 1==bluetooth send the bmp sensor read and average
 short debug_mode = 0;
 
+// this belongs into comms.ino. But it has to be in a separate file because - Arduino.
+enum scan_callback_result {None, Coyote, Bottle};
 
 void leds_setup() {
   // "Boot" mode
   px.begin();
-  px.setBrightness(70);
+  px.setBrightness(40);
   px.setPixelColor(0, 255, 255, 255);
   px.setPixelColor(1, 255, 255, 255);
   px.show();
@@ -269,9 +272,13 @@ void setup() {
   leds_startingstate();
   comms_init(bottle_number);
   Serial.printf("I am bottle number %d\n", bottle_number);
+#ifdef ESP32
+  xTaskCreate(TaskMain, "Main", 10000, nullptr, 1, nullptr);
+  xTaskCreate(TaskScan, "Scan", 10000, nullptr, 2, nullptr);
+#endif
 }
 
-void loop() {
+void main_loop() {
   comms_uart_colorpicker();
   debug_checkcodespeed();
   check_breath();
@@ -280,3 +287,27 @@ void loop() {
   leds_do_fade();
   delay(100);
 }
+
+#ifndef ESP32
+void loop() {
+  main_loop();
+}
+#else
+void loop() {
+}
+
+void TaskMain(void *pvParameters) {
+  Serial.println("Trying to execute main");
+  vTaskDelay(200);
+  while (true)
+    main_loop();
+}
+
+void TaskScan(void *pvParameters) {
+  while (true) {
+    scan_loop();
+  }
+}
+
+#endif
+
