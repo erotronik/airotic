@@ -41,7 +41,7 @@
 #include <Adafruit_NeoPixel.h>
 
 #ifdef ESP32
-#include "BLEDevice.h"
+#include "NimBLEDevice.h"
 #ifdef ENABLE_WIFI
 #include <WiFi.h>
 #include <AsyncMqtt_Generic.h>

@@ -12,8 +12,6 @@ uint8_t BATTERY_CHAR_UUID[] = {0xad, 0xe8, 0xf3, 0xd4, 0xb8, 0x84, 0x94, 0xa0, 0
 
 #ifdef ESP32
 
-#include "BLEDevice.h"
-
 static BLEUUID COYOTE_SERVICE_BLEUUID(COYOTE_SERVICE_UUID, 16, false);
 static BLEUUID CONFIG_CHAR_BLEUUID(CONFIG_CHAR_UUID, 16, false);
 static BLEUUID POWER_CHAR_BLEUUID(POWER_CHAR_UUID, 16, false);
@@ -41,7 +39,7 @@ static void bubbler_notify_callback(
   size_t length,
   bool isNotify) {
     Serial.print("Notify callback for characteristic ");
-    Serial.print(pBLERemoteCharacteristic->getUUID().toString().c_str());
+    Serial.print(pBLERemoteCharacteristic->getUUID().toString().c_str());    
     Serial.print(" of data length ");
     Serial.println(length);
     Serial.print("data: ");
@@ -50,8 +48,8 @@ static void bubbler_notify_callback(
 
 void coyote_setup(void) {
   Serial.println("Creating BLE client");
-
-
+  Serial.printf("Looking for service %s\n", COYOTE_SERVICE_BLEUUID.toString().c_str());
+  Serial.printf("Looking for char %s\n", CONFIG_CHAR_BLEUUID.toString().c_str());
 }
 
 bool connect_to_coyote(BLEAdvertisedDevice* coyote_device) {

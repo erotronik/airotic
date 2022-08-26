@@ -82,11 +82,7 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
 
 #else /* ESP32 */
 
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLEAdvertisedDevice.h>
-#include <BLE2902.h>
+#include <NimBLEDevice.h>
 
 BLEServer *pServer = NULL;
 BLECharacteristic * pTxCharacteristic;
@@ -142,12 +138,12 @@ BLEAdvertisedDevice* coyote_device = nullptr;
 
 
 class BubblerAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice advertisedDevice) {
-      Serial.printf("Advertised Device: %s \n", advertisedDevice.toString().c_str());
-      auto res = check_scan_data(advertisedDevice.getManufacturerData(), advertisedDevice.getRSSI());
+    void onResult(BLEAdvertisedDevice* advertisedDevice) {
+      //Serial.printf("Advertised Device: %s \n", advertisedDevice->toString().c_str());
+      auto res = check_scan_data(advertisedDevice->getManufacturerData(), advertisedDevice->getRSSI());
       if ( res == Coyote ) {
         // can't connect while scanning is going on - it locks up everything.
-        coyote_device = new BLEAdvertisedDevice(advertisedDevice);
+        coyote_device = new BLEAdvertisedDevice(*advertisedDevice);
         BLEDevice::getScan()->stop();
       }
     }
@@ -163,7 +159,7 @@ void comms_init(short myid) {
 
   pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new BubblerAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(false); //active scan uses more power, but get results faster
+  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
   pBLEScan->setInterval(2000);
   pBLEScan->setWindow(2000);  // less or equal setInterval value
 
@@ -196,16 +192,14 @@ void comms_start_adv(void) {
 
   // Create a BLE Characteristic
   pTxCharacteristic = pService->createCharacteristic(
-                    CHARACTERISTIC_UUID_TX,
-                    BLECharacteristic::PROPERTY_NOTIFY
-                  );
-
-  pTxCharacteristic->addDescriptor(new BLE2902());
+                      CHARACTERISTIC_UUID_TX,
+                      NIMBLE_PROPERTY::NOTIFY
+                      );
 
   BLECharacteristic * pRxCharacteristic = pService->createCharacteristic(
-                       CHARACTERISTIC_UUID_RX,
-                      BLECharacteristic::PROPERTY_WRITE
-                    );
+                                          CHARACTERISTIC_UUID_RX,
+                                          NIMBLE_PROPERTY::WRITE
+                                          );
 
   pRxCharacteristic->setCallbacks(&callbacks);
 
