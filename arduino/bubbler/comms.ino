@@ -1,3 +1,5 @@
+#ifdef ENABLE_BLE
+
 // https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers steal a name nothing over 0x1000 is used anyway
 #define our_fake_company_id0 0xf1
 #define our_fake_company_id1 0xf1
@@ -72,7 +74,7 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
   uint8_t buffer[32];
   uint8_t len = Bluefruit.Scanner.parseReportByType(report, BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA, buffer, sizeof(buffer));
 
-  auto res = check_scan_data(std::string((char*)buffer, len), report->rssi);
+  auto res = check_scan_data((char*)buffer, len, report->rssi);
 
   if ( res == Coyote )
     Bluefruit.Central.connect(report);
@@ -140,7 +142,7 @@ BLEAdvertisedDevice* coyote_device = nullptr;
 class BubblerAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice* advertisedDevice) {
       //Serial.printf("Advertised Device: %s \n", advertisedDevice->toString().c_str());
-      auto res = check_scan_data(advertisedDevice->getManufacturerData(), advertisedDevice->getRSSI());
+      auto res = check_scan_data(advertisedDevice->getManufacturerData().c_str(), advertisedDevice->getManufacturerData().length(), advertisedDevice->getRSSI());
       if ( res == Coyote ) {
         // can't connect while scanning is going on - it locks up everything.
         coyote_device = new BLEAdvertisedDevice(*advertisedDevice);
@@ -333,7 +335,7 @@ void comms_uart_colorpicker(void) {
       NVIC_SystemReset();
 #else
       ESP.restart();
-#endif;
+#endif
     } else {
       btAndSerialPrintf("bad number\n");
     }
@@ -344,14 +346,14 @@ void comms_uart_colorpicker(void) {
   }
 }
 
-enum scan_callback_result check_scan_data(std::string ble_manufacturer_specific_data, int rssi) {
-  if (ble_manufacturer_specific_data.length() > 2 && ble_manufacturer_specific_data[1] == 0x19 && ble_manufacturer_specific_data[0] == 0x96) {
+enum scan_callback_result check_scan_data(const char* ble_manufacturer_specific_data, int length, int rssi) {
+  if (length > 2 && ble_manufacturer_specific_data[1] == 0x19 && ble_manufacturer_specific_data[0] == 0x96) {
     //
     // Found a Coyote
     //
     btAndSerialPrintf("Found DG-LAB\n");
     return Coyote;
-  } else if (ble_manufacturer_specific_data.length() > 2 && ble_manufacturer_specific_data[1] == our_fake_company_id1 && ble_manufacturer_specific_data[0] == our_fake_company_id0) {
+  } else if (length > 2 && ble_manufacturer_specific_data[1] == our_fake_company_id1 && ble_manufacturer_specific_data[0] == our_fake_company_id0) {
     //
     // Found a Bottle
     //
@@ -420,3 +422,5 @@ void btAndSerialPrintf(const char* format, ...) {
 
   delete(buffer);
 }
+
+#endif /* ENABLE_BLE */

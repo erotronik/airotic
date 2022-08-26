@@ -3,10 +3,14 @@
 
 Adafruit_BMP280 bmp;
 
+// Track if we do have an airsensor. If no, just return a 0 for read, but otherwise work.
+// This lets us, e.e., debug BLE with just a board, even if it does not feature a sensor.
+bool have_airsensor = true;
+
 void airsensor_setup() {
   if (!bmp.begin(0x76, BMP280_CHIPID)) {
     Serial.println("Missing BMP280");
-    //while(1) yield();
+    return;
   }
   bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
                   Adafruit_BMP280::SAMPLING_NONE, /* No temperature */
@@ -16,5 +20,8 @@ void airsensor_setup() {
 }
 
 int airsensor_read() {
+  if ( ! have_airsensor )
+    return 0;
+
   return bmp.readPressure();
 }

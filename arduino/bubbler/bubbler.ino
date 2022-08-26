@@ -40,6 +40,15 @@
 #include <FastLED.h>
 #include <Adafruit_NeoPixel.h>
 
+#define ENABLE_BLE /* uncomment to enable BLE communications */
+// #define ENABLE_WIFI /* uncomment to enable WIFI communications, only ESP32 */
+
+#define PIXEL_TYPE NEO_GRBW + NEO_KHZ800 /* The Pixel type that you have, defined as per Adafruit neopixel library. You might have to change, e.g. the color order */
+
+#define MAX_BOTTLES 16 /* Maximum bottles supported for BLE communication */
+#define NUM_LEDS 2 /* Number of LEDS - this is two, unless you change the hardware */
+// #define LED_DATA_PIN 5 /* the data pin on which the LED is. This is automatically set below - only change if you need ot to be different */
+
 #ifdef ESP32
 #include "NimBLEDevice.h"
 #ifdef ENABLE_WIFI
@@ -52,7 +61,6 @@
 #include <bluefruit.h>
 #endif
 
-#define MAX_BOTTLES 16
 typedef struct {
   CHSV colorTarget;
   CHSV colorStart;
@@ -63,7 +71,7 @@ typedef struct {
 } bottle_t;
 bottle_t seen_bottles[MAX_BOTTLES];
 
-#define NUM_LEDS 2
+#ifndef LED_DATA_PIN
 #ifndef ESP32
 // ItsyBitsy has level-shift on pin 5
 #define LED_DATA_PIN 5
@@ -71,7 +79,7 @@ bottle_t seen_bottles[MAX_BOTTLES];
 // On ESP32, use A0
 #define LED_DATA_PIN 4
 #endif
-#define PIXEL_TYPE NEO_GRBW + NEO_KHZ800
+#endif
 
 Adafruit_NeoPixel px = Adafruit_NeoPixel(NUM_LEDS, LED_DATA_PIN, PIXEL_TYPE);
 
@@ -195,8 +203,8 @@ void debug_checkcodespeed() {
   }
 }
 
-/*
 void look_for_close_bottles() {
+#ifdef ENABLE_BLE
   //
   // Any other Bottles close?  "Merge" colours if 2, Fixed colour if 3
   //
@@ -242,9 +250,8 @@ void look_for_close_bottles() {
       colorTarget = CHSV(255, 255, 255);
       colorStart = CHSV(42, 255, 255);
   } // otherwise n==1 use the one we found above.
+#endif
 }
-
-*/
 
 void bottle_setup() {
   // MAX_BOTTLES green bottles, sitting on a wall...
@@ -270,20 +277,30 @@ void setup() {
 #endif
 #endif
   leds_startingstate();
+#ifdef ENABLE_BLE
   comms_init(bottle_number);
+#endif
   Serial.printf("I am bottle number %d\n", bottle_number);
 #ifdef ESP32
   xTaskCreate(TaskMain, "Main", 10000, nullptr, 1, nullptr);
+#ifdef ENABLE_BLE
   xTaskCreate(TaskScan, "Scan", 10000, nullptr, 2, nullptr);
+#endif
 #endif
 }
 
 void main_loop() {
+#ifdef ENABLE_BLE
   comms_uart_colorpicker();
+#endif
   debug_checkcodespeed();
   check_breath();
-  //comms_check_distance(DISTANCE_TO_SYNC_LEDS);
-  //look_for_close_bottles();
+#ifdef ENABLE_BLE
+#ifndef ESP32
+  comms_check_distance(DISTANCE_TO_SYNC_LEDS);
+#endif /* ESP32 */
+  look_for_close_bottles();
+#endif /* ENABLE_BLE */
   leds_do_fade();
   delay(100);
 }
@@ -303,11 +320,13 @@ void TaskMain(void *pvParameters) {
     main_loop();
 }
 
+#if defined(ENABLE_BLE) && defined(ESP32)
 void TaskScan(void *pvParameters) {
   while (true) {
     scan_loop();
   }
 }
+#endif
 
 #endif
 

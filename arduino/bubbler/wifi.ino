@@ -1,5 +1,12 @@
-#ifdef ESP32
 #ifdef ENABLE_WIFI
+
+#ifndef ESP32
+#error ESP32 required for wifi
+#endif
+
+#ifdef ENABLE_BLE
+#error BLE and WiFi cannot be used simultaneously
+#endif
 
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -109,5 +116,4 @@ void wifi_setup() {
   wimu.run();
 }
 
-#endif
 #endif

@@ -1,3 +1,5 @@
+#ifdef ENABLE_BLE
+
 // References:
 // https://rezreal.github.io/coyote/web-bluetooth-example.html
 // https://github.com/OpenDGLab/OpenDGLab-Connect/blob/master/src/services/DGLab.js
@@ -331,4 +333,5 @@ void central_connect_callback(uint16_t conn_handle) {
   Serial.println("coyote connected!");
 }
 
-#endif
+#endif /* not ESP32 */
+#endif /* ENABLE_BLE */
