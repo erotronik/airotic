@@ -14,29 +14,29 @@ uint8_t BATTERY_CHAR_UUID[] = {0xad, 0xe8, 0xf3, 0xd4, 0xb8, 0x84, 0x94, 0xa0, 0
 
 #ifdef ESP32
 
-static BLEUUID COYOTE_SERVICE_BLEUUID(COYOTE_SERVICE_UUID, 16, false);
-static BLEUUID CONFIG_CHAR_BLEUUID(CONFIG_CHAR_UUID, 16, false);
-static BLEUUID POWER_CHAR_BLEUUID(POWER_CHAR_UUID, 16, false);
-static BLEUUID A_CHAR_BLEUUID(A_CHAR_UUID, 16, false);
-static BLEUUID B_CHAR_BLEUUID(B_CHAR_UUID, 16, false);
-static BLEUUID BATTERY_BLEUUID(BATTERY_UUID, 16, false);
-static BLEUUID BATTERY_CHAR_BLEUUID(BATTERY_CHAR_UUID, 16, false);
+static NimBLEUUID COYOTE_SERVICE_BLEUUID(COYOTE_SERVICE_UUID, 16, false);
+static NimBLEUUID CONFIG_CHAR_BLEUUID(CONFIG_CHAR_UUID, 16, false);
+static NimBLEUUID POWER_CHAR_BLEUUID(POWER_CHAR_UUID, 16, false);
+static NimBLEUUID A_CHAR_BLEUUID(A_CHAR_UUID, 16, false);
+static NimBLEUUID B_CHAR_BLEUUID(B_CHAR_UUID, 16, false);
+static NimBLEUUID BATTERY_BLEUUID(BATTERY_UUID, 16, false);
+static NimBLEUUID BATTERY_CHAR_BLEUUID(BATTERY_CHAR_UUID, 16, false);
 
-BLEClient* pClient;
+NimBLEClient* pClient;
 
-class BubblerClientCallback : public BLEClientCallbacks {
-  void onConnect(BLEClient* pclient) {
+class BubblerClientCallback : public NimBLEClientCallbacks {
+  void onConnect(NimBLEClient* pclient) {
     Serial.println("Client onConnect");
   }
 
-  void onDisconnect(BLEClient* pclient) {
+  void onDisconnect(NimBLEClient* pclient) {
     client_connected = false;
     Serial.println("Client onDisconnect");
   }
 };
 
 static void bubbler_notify_callback(
-  BLERemoteCharacteristic* pBLERemoteCharacteristic,
+  NimBLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData,
   size_t length,
   bool isNotify) {
@@ -54,10 +54,10 @@ void coyote_setup(void) {
   Serial.printf("Looking for char %s\n", CONFIG_CHAR_BLEUUID.toString().c_str());
 }
 
-bool connect_to_coyote(BLEAdvertisedDevice* coyote_device) {
-  static BLERemoteCharacteristic* pRemoteCharacteristic;
+bool connect_to_coyote(NimBLEAdvertisedDevice* coyote_device) {
+  static NimBLERemoteCharacteristic* pRemoteCharacteristic;
 
-  pClient = BLEDevice::createClient();
+  pClient = NimBLEDevice::createClient();
   pClient->setClientCallbacks(new BubblerClientCallback());
 
   if ( client_connected )
@@ -83,7 +83,7 @@ bool connect_to_coyote(BLEAdvertisedDevice* coyote_device) {
   Serial.println("Done");
 */
 
-  BLERemoteService* pRemoteService = pClient->getService(COYOTE_SERVICE_BLEUUID);
+  NimBLERemoteService* pRemoteService = pClient->getService(COYOTE_SERVICE_BLEUUID);
   if (pRemoteService == nullptr) {
     Serial.print("Failed to find our service UUID: ");
     Serial.println(COYOTE_SERVICE_BLEUUID.toString().c_str());

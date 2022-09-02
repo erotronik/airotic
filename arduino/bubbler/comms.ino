@@ -86,23 +86,23 @@ void scan_callback(ble_gap_evt_adv_report_t *report)
 
 #include <NimBLEDevice.h>
 
-BLEServer *pServer = NULL;
-BLECharacteristic * pTxCharacteristic;
+NimBLEServer *pServer = NULL;
+NimBLECharacteristic * pTxCharacteristic;
 bool device_connected = false;
-BLEScan* pBLEScan;
+NimBLEScan* pBLEScan;
 int scanTime = 5; //In seconds
 
 #define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E" // UART service UUID
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
-class BubblerServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
+class BubblerServerCallbacks: public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer* pServer) {
       Serial.println("Device connected");
       device_connected = true;
     };
 
-    void onDisconnect(BLEServer* pServer) {
+    void onDisconnect(NimBLEServer* pServer) {
       Serial.println("Device disconnected");
       device_connected = false;
       // we need to manually restart advertising
@@ -110,8 +110,8 @@ class BubblerServerCallbacks: public BLEServerCallbacks {
     }
 };
 
-class BubblerCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
+class BubblerCallbacks: public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic *pCharacteristic) {
       std::string rxValue = pCharacteristic->getValue();
 
       if (rxValue.length() > 0)
@@ -136,17 +136,17 @@ public:
 };
 
 bool client_connected = false;
-BLEAdvertisedDevice* coyote_device = nullptr;
+NimBLEAdvertisedDevice* coyote_device = nullptr;
 
 
-class BubblerAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice* advertisedDevice) {
+class BubblerAdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
+    void onResult(NimBLEAdvertisedDevice* advertisedDevice) {
       //Serial.printf("Advertised Device: %s \n", advertisedDevice->toString().c_str());
       auto res = check_scan_data(advertisedDevice->getManufacturerData().c_str(), advertisedDevice->getManufacturerData().length(), advertisedDevice->getRSSI());
       if ( res == Coyote ) {
         // can't connect while scanning is going on - it locks up everything.
-        coyote_device = new BLEAdvertisedDevice(*advertisedDevice);
-        BLEDevice::getScan()->stop();
+        coyote_device = new NimBLEAdvertisedDevice(*advertisedDevice);
+        NimBLEDevice::getScan()->stop();
       }
     }
 };
@@ -156,16 +156,16 @@ BubblerCallbacks callbacks;
 void comms_init(short myid) {
   char buf[15];
   snprintf(buf, 15, "Air%02d", myid);
-  BLEDevice::init(buf);
+  NimBLEDevice::init(buf);
   // BLEDevice::setPower(ESP_PWR_LVL_P9);
 
-  pBLEScan = BLEDevice::getScan(); //create new scan
+  pBLEScan = NimBLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new BubblerAdvertisedDeviceCallbacks());
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
   pBLEScan->setInterval(2000);
   pBLEScan->setWindow(2000);  // less or equal setInterval value
 
-  pServer = BLEDevice::createServer();
+  pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new BubblerServerCallbacks());
   comms_start_adv();
   coyote_setup();
@@ -173,7 +173,7 @@ void comms_init(short myid) {
 
 void scan_loop() {
   if ( !client_connected ) {
-    BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
+    NimBLEScanResults foundDevices = pBLEScan->start(scanTime, false);
     Serial.print("Devices found: ");
     Serial.println(foundDevices.getCount());
     Serial.println("Scan done!");
@@ -190,7 +190,7 @@ void scan_loop() {
 
 void comms_start_adv(void) {
   // Create the BLE Service
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+  NimBLEService *pService = pServer->createService(SERVICE_UUID);
 
   // Create a BLE Characteristic
   pTxCharacteristic = pService->createCharacteristic(
@@ -198,7 +198,7 @@ void comms_start_adv(void) {
                       NIMBLE_PROPERTY::NOTIFY
                       );
 
-  BLECharacteristic * pRxCharacteristic = pService->createCharacteristic(
+  NimBLECharacteristic * pRxCharacteristic = pService->createCharacteristic(
                                           CHARACTERISTIC_UUID_RX,
                                           NIMBLE_PROPERTY::WRITE
                                           );
