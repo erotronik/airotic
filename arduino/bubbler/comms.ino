@@ -105,9 +105,7 @@ class BubblerServerCallbacks: public NimBLEServerCallbacks {
     void onDisconnect(NimBLEServer* pServer) {
       Serial.println("Device disconnected");
       device_connected = false;
-      // we need to manually restart advertising
-      pServer->getAdvertising()->start();
-    }
+     }
 };
 
 class BubblerCallbacks: public NimBLECharacteristicCallbacks {
@@ -135,9 +133,7 @@ public:
     std::string buffer;
 };
 
-bool client_connected = false;
 NimBLEAdvertisedDevice* coyote_device = nullptr;
-
 
 class BubblerAdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
     void onResult(NimBLEAdvertisedDevice* advertisedDevice) {
@@ -157,13 +153,13 @@ void comms_init(short myid) {
   char buf[15];
   snprintf(buf, 15, "Air%02d", myid);
   NimBLEDevice::init(buf);
-  // BLEDevice::setPower(ESP_PWR_LVL_P9);
+  NimBLEDevice::setPower(ESP_PWR_LVL_P6, ESP_BLE_PWR_TYPE_ADV); // send advertisements with 6 dbm
 
   pBLEScan = NimBLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new BubblerAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
-  pBLEScan->setInterval(2000);
-  pBLEScan->setWindow(2000);  // less or equal setInterval value
+  pBLEScan->setActiveScan(false); //active scan uses more power, but get results faster
+  pBLEScan->setInterval(250);
+  pBLEScan->setWindow(125);  // less or equal setInterval value
 
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new BubblerServerCallbacks());
@@ -172,7 +168,7 @@ void comms_init(short myid) {
 }
 
 void scan_loop() {
-  if ( !client_connected ) {
+  if ( !coyote_connected ) {
     NimBLEScanResults foundDevices = pBLEScan->start(scanTime, false);
     Serial.print("Devices found: ");
     Serial.println(foundDevices.getCount());
@@ -185,12 +181,23 @@ void scan_loop() {
       delete coyote_device;
       coyote_device = nullptr;      
     }
+  } else {
+    // everything is happening in callbacks / timers
+    delay(1000);
   }
 }
 
 void comms_start_adv(void) {
   // Create the BLE Service
   NimBLEService *pService = pServer->createService(SERVICE_UUID);
+
+  // max is 7 bytes we can fit in, so assume "v" is always 255
+  uint8_t msd_payload[7] = {our_fake_company_id0, our_fake_company_id1,
+                            bottle_number,
+                            colorTarget.h, colorTarget.s,
+                            colorStart.h, colorStart.s
+                           };
+  std::string msd_payload_str((char*)msd_payload, 7);
 
   // Create a BLE Characteristic
   pTxCharacteristic = pService->createCharacteristic(
@@ -209,16 +216,16 @@ void comms_start_adv(void) {
   pService->start();
 
   // Start advertising
-  pServer->getAdvertising()->start();
+  pServer->getAdvertising()->setManufacturerData(msd_payload_str);
+  pServer->advertiseOnDisconnect(true);
+  pServer->startAdvertising();
 }
 
 #endif
 
 void comms_send_breath(boolean b) {
   btAndSerialPrintf("*%c\n",b?'B':'R');
-#ifndef ESP32
   coyote_cb(b);
-#endif
 }
 
 void comms_uart_send_bottles() {

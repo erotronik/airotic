@@ -158,7 +158,7 @@ void check_breath() {
     blow_state = 1;
     fade = 0;
     // fade, but slow while the breath is happening
-    //comms_send_breath(true);
+    comms_send_breath(true);
 #ifdef ESP32
 #ifdef ENABLE_WIFI
     wifi_send_breath(true);
@@ -169,7 +169,7 @@ void check_breath() {
     colorWas = colorStart;
   } else if (blow_state == 1 && pread > avg) {
     blow_state = 0;
-    //comms_send_breath(false);
+    comms_send_breath(false);
 #ifdef ESP32
 #ifdef ENABLE_WIFI
     wifi_send_breath(false);
@@ -181,7 +181,6 @@ void check_breath() {
   //if (debug_mode & 1) comms_uart_send_graph(pread, avg);
   //Serial.printf("%d,%d,%d\n",pread,avg,avg-avthres);
   avg = (avg * 8 + pread * 2) / 10;
-
 }
 
 void debug_checkcodespeed() {
@@ -296,9 +295,7 @@ void main_loop() {
   debug_checkcodespeed();
   check_breath();
 #ifdef ENABLE_BLE
-#ifndef ESP32
   comms_check_distance(DISTANCE_TO_SYNC_LEDS);
-#endif /* ESP32 */
   look_for_close_bottles();
 #endif /* ENABLE_BLE */
   leds_do_fade();
