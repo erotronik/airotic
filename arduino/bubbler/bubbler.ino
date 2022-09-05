@@ -43,7 +43,7 @@
 #define ENABLE_BLE /* uncomment to enable BLE communications */
 // #define ENABLE_WIFI /* uncomment to enable WIFI communications, only ESP32 */
 
-#define PIXEL_TYPE NEO_GRBW + NEO_KHZ800 /* The Pixel type that you have, defined as per Adafruit neopixel library. You might have to change, e.g. the color order */
+#define PIXEL_TYPE NEO_GRB + NEO_KHZ800 /* The Pixel type that you have, defined as per Adafruit neopixel library. You might have to change, e.g. the color order */
 
 #define MAX_BOTTLES 16 /* Maximum bottles supported for BLE communication */
 #define NUM_LEDS 2 /* Number of LEDS - this is two, unless you change the hardware */
@@ -280,11 +280,9 @@ void setup() {
   comms_init(bottle_number);
 #endif
   Serial.printf("I am bottle number %d\n", bottle_number);
-#ifdef ESP32
   xTaskCreate(TaskMain, "Main", 10000, nullptr, 1, nullptr);
-#ifdef ENABLE_BLE
+#if defined(ENABLE_BLE) && defined(ESP32)
   xTaskCreate(TaskScan, "Scan", 10000, nullptr, 2, nullptr);
-#endif
 #endif
 }
 
@@ -302,11 +300,6 @@ void main_loop() {
   delay(100);
 }
 
-#ifndef ESP32
-void loop() {
-  main_loop();
-}
-#else
 void loop() {
 }
 
@@ -324,6 +317,3 @@ void TaskScan(void *pvParameters) {
   }
 }
 #endif
-
-#endif
-

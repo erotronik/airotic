@@ -279,8 +279,6 @@ void comms_uart_colorpicker(void) {
   if (!bt && Serial.available()<1)
     return;
 
-  Serial.println("Got something");
-
   int command = bt?bluetooth_read():Serial.read();
   if (command != '!')
      return;
