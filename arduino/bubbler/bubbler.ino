@@ -25,6 +25,13 @@
 // Push Control pad 4 - restart device so we advertise correct colours and name
 // Use UART mode and type "!S1" to set device to ID 1 (1-9 allowed)
 //
+// This version will also look for DG-Labs Coyote bluetooth powerboxes. If it
+// finds one it will connect to it and send 5 'breath' waves to both A and B
+// channels at level '150' (defined in coyote.h, usually 2000 max). Then every breath
+// sends a 'breath' wave to channels A and B. You can alter the level up and down
+// using the rocker switches on the box, these are forgotten when you disconnect.  Holding
+// a rocker switch will reset the channel to zero and you'll need to disconnect or restart
+// the bottle to get back to the default.
 
 // rssi average below which we merge the LEDS of seen bottles
 // not configurable as kind of needs to be the same on each bottle to work

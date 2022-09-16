@@ -14,6 +14,7 @@ The next generation of bubbler bottles, with RGB lighting and bluetooth.
 * Low cost compared to commercial bottles
 * Uses easily sourced parts including bottle, pressure sensor module, Bluetooth Arduino board
 * Powered by small USB portable power pack, will run for a day even on the smallest packs
+* Can connect to Coyote DG-Labs e-stim box
 * Other features and modes to be announced and released
 * Open Source software and hardware design
 
@@ -28,6 +29,10 @@ We really didn't want to make and sell them. So why not build your own? Please d
 ## Safety
 
 This bubbler bottle is designed for your own personal use in a situation where you have the ability to disconnect your mask. It is not designed to restrict or block any ability to breathe. The bottle also works just fine without any liquid and will still light up and detect breathing. If you plan to use them at an event please check with an event organiser first.
+
+## Battery Safety
+
+We have designed the bubbler bottle to use an external USB Powerbank. This is deliberate and we did not want to use a LIPO battery. We have personally witnessed several LIPO failures over the years, some while charging, but not always. The last thing you want is your LIPO battery to explode or start venting lithium gasses into your breathing path. 
 
 ## Build your own
 
