@@ -10,8 +10,10 @@ bool have_airsensor = true;
 void airsensor_setup() {
   if (!bmp.begin(0x76, BMP280_CHIPID)) {
     Serial.println("Missing BMP280");
+    have_airsensor = false;
     return;
   }
+
   bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
                   Adafruit_BMP280::SAMPLING_NONE, /* No temperature */
                   Adafruit_BMP280::SAMPLING_X1, /* Pressure, no oversampling */

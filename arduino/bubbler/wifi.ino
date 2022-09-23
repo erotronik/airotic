@@ -1,3 +1,7 @@
+// Wifi only works on the ESP32. Note that this is pretty rough.
+// Also note - if you want to use wifi, you have to provide an arduino_secrets.h file
+// and provide the belowmentioned SECRET_* values.
+
 #ifdef ENABLE_WIFI
 
 #ifndef ESP32

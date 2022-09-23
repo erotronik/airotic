@@ -1,3 +1,6 @@
+// BLE implementation. This file has the Itsy Bitsy implementation first, followed
+// by the ESP32 implementation, followed by the architecture-independent methods.
+
 #ifdef ENABLE_BLE
 
 // https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers steal a name nothing over 0x1000 is used anyway
@@ -170,9 +173,7 @@ void comms_init(short myid) {
 void scan_loop() {
   if ( !coyote_connected ) {
     NimBLEScanResults foundDevices = pBLEScan->start(scanTime, false);
-    Serial.print("Devices found: ");
-    Serial.println(foundDevices.getCount());
-    Serial.println("Scan done!");
+
     pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
     delay(2000);
 
@@ -258,7 +259,6 @@ int bluetooth_read() {
   return bleuart.read();
 #else
   auto data = callbacks.get_char();
-  Serial.printf("Got: %c\n", data);
   return data;
 #endif
 }

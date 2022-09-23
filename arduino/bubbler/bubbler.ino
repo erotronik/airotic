@@ -14,9 +14,13 @@
 //
 // Hardware:
 //
-// ItsyBitsy nRF52840 Express
+// When using ItsyBitsy nRF52840 Express
 //
 // BMP280 on SDL/SCA/3v/0v, two WS2812b (neopixels) chained on pin 5/+V/0v
+//
+// When using QT Py ESP32-C3
+//
+// BMP280 on SDL/SCA/3v/0x, two WS2912b (neopixels) chained on pin A0/5V/GND
 //
 // Use the Adafruit controller app "Controller"
 // Push Control pad 1 - then use color picker for "at rest" colour
@@ -41,13 +45,13 @@
 #include <Adafruit_NeoPixel.h>
 
 #define ENABLE_BLE /* uncomment to enable BLE communications */
-// #define ENABLE_WIFI /* uncomment to enable WIFI communications, only ESP32 */
+//#define ENABLE_WIFI /* uncomment to enable WIFI communications, only ESP32 */
 
 #define PIXEL_TYPE NEO_GRB + NEO_KHZ800 /* The Pixel type that you have, defined as per Adafruit neopixel library. You might have to change, e.g. the color order */
 
 #define MAX_BOTTLES 16 /* Maximum bottles supported for BLE communication */
 #define NUM_LEDS 2 /* Number of LEDS - this is two, unless you change the hardware */
-// #define LED_DATA_PIN 5 /* the data pin on which the LED is. This is automatically set below - only change if you need ot to be different */
+// #define LED_DATA_PIN 5 /* the data pin on which the LED is. This is automatically set below - only change if you need it to be different */
 
 #ifdef ESP32
 #include "NimBLEDevice.h"
@@ -76,7 +80,7 @@ bottle_t seen_bottles[MAX_BOTTLES];
 // ItsyBitsy has level-shift on pin 5
 #define LED_DATA_PIN 5
 #else
-// On ESP32, use A0
+// On QT Py, use A0
 #define LED_DATA_PIN 4
 #endif
 #endif
@@ -109,7 +113,6 @@ enum scan_callback_result {None, Coyote, Bottle};
 void leds_setup() {
   // "Boot" mode
   px.begin();
-  px.setBrightness(40);
   px.setPixelColor(0, 255, 255, 255);
   px.setPixelColor(1, 255, 255, 255);
   px.show();
@@ -158,22 +161,22 @@ void check_breath() {
     blow_state = 1;
     fade = 0;
     // fade, but slow while the breath is happening
+#ifdef ENABLE_BLE
     comms_send_breath(true);
-#ifdef ESP32
+#endif
 #ifdef ENABLE_WIFI
     wifi_send_breath(true);
-#endif
 #endif
     fadespeed = 4;
     colorCurrent = colorStart;
     colorWas = colorStart;
   } else if (blow_state == 1 && pread > avg) {
     blow_state = 0;
+#ifdef ENABLE_BLE
     comms_send_breath(false);
-#ifdef ESP32
+#endif
 #ifdef ENABLE_WIFI
     wifi_send_breath(false);
-#endif
 #endif
     // fade back faster now the breath has 'stopped'
     fadespeed = 16;
@@ -300,16 +303,19 @@ void main_loop() {
   delay(100);
 }
 
+// Leave empty - we are using FreeRTOS tasks instead of the Arduino main loop
 void loop() {
 }
 
 void TaskMain(void *pvParameters) {
-  Serial.println("Trying to execute main");
   vTaskDelay(200);
   while (true)
     main_loop();
 }
 
+// On the ESP32, we scan in a separate task - scanning is a blocking
+// operation. All the communication with the Coyote also happens
+// in this task.
 #if defined(ENABLE_BLE) && defined(ESP32)
 void TaskScan(void *pvParameters) {
   while (true) {

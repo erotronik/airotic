@@ -1,3 +1,6 @@
+// Storage has two separate implementations for the Itsy Bitsy and for the ESP32
+// On the Itsy Bitsy, we use a FAT filesystem, on the ESP32 we use LittleFS.
+
 #ifndef ESP32
 
 // No EEPROM.h on the itsybitsy so instead use SPI flash and store stuff in a file
