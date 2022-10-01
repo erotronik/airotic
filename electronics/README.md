@@ -11,6 +11,8 @@
 | A tiny bit of double sided foam tape (or hotglue)||[Adafruit](https://www.adafruit.com/product/5019)|
 | one M2.5 5mm screw|any hardware store or ebay|
 
+Note that it is now possible to use an ESP32 instead of the Adafruit Itsy Bitsy; see this [separate readme](ESP32.md).
+
 ## Construction
 
 ### Step 1

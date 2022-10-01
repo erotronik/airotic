@@ -1,5 +1,7 @@
 # Bubbler Bottle programming
 
+Note - there is a [separate Readme if you use an ESP32](ESP32.md).
+
 ## Programming setup
 
 * Install the arduino tool and board support. [Use this Adafruit guide](https://learn.adafruit.com/adafruit-itsybitsy-nrf52840-express/arduino-support-setup)
@@ -7,6 +9,7 @@
   * Search for "FastLED" and install it
   * Search for "BMP280" and install "Adafruit BMP280 Library"
   * Search for "spiflash" and install "Adafruit_SPIFlash"
+  * Search for "NeoPixel" and install "Adafruit NeoPixel"
 
 ## Programming first step
 

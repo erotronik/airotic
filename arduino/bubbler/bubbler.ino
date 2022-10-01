@@ -14,9 +14,13 @@
 //
 // Hardware:
 //
-// ItsyBitsy nRF52840 Express
+// When using ItsyBitsy nRF52840 Express
 //
 // BMP280 on SDL/SCA/3v/0v, two WS2812b (neopixels) chained on pin 5/+V/0v
+//
+// When using QT Py ESP32-C3
+//
+// BMP280 on SDL/SCA/3v/0x, two WS2912b (neopixels) chained on pin A0/5V/GND
 //
 // Use the Adafruit controller app "Controller"
 // Push Control pad 1 - then use color picker for "at rest" colour
@@ -38,9 +42,29 @@
 #define DISTANCE_TO_SYNC_LEDS 64
 
 #include <FastLED.h>
-#include <bluefruit.h>
+#include <Adafruit_NeoPixel.h>
 
-#define MAX_BOTTLES 16
+#define ENABLE_BLE /* uncomment to enable BLE communications */
+//#define ENABLE_WIFI /* uncomment to enable WIFI communications, only ESP32 */
+
+#define PIXEL_TYPE NEO_GRB + NEO_KHZ800 /* The Pixel type that you have, defined as per Adafruit neopixel library. You might have to change, e.g. the color order */
+
+#define MAX_BOTTLES 16 /* Maximum bottles supported for BLE communication */
+#define NUM_LEDS 2 /* Number of LEDS - this is two, unless you change the hardware */
+// #define LED_DATA_PIN 5 /* the data pin on which the LED is. This is automatically set below - only change if you need it to be different */
+
+#ifdef ESP32
+#include "NimBLEDevice.h"
+#ifdef ENABLE_WIFI
+#include <WiFi.h>
+#include <AsyncMqtt_Generic.h>
+#endif /* ENABLE_WIFI */ 
+#endif /* ESP32 */
+
+#ifndef ESP32
+#include <bluefruit.h>
+#endif
+
 typedef struct {
   CHSV colorTarget;
   CHSV colorStart;
@@ -51,8 +75,17 @@ typedef struct {
 } bottle_t;
 bottle_t seen_bottles[MAX_BOTTLES];
 
-#define NUM_LEDS 2
-CRGB leds[NUM_LEDS];
+#ifndef LED_DATA_PIN
+#ifndef ESP32
+// ItsyBitsy has level-shift on pin 5
+#define LED_DATA_PIN 5
+#else
+// On QT Py, use A0
+#define LED_DATA_PIN 4
+#endif
+#endif
+
+Adafruit_NeoPixel px = Adafruit_NeoPixel(NUM_LEDS, LED_DATA_PIN, PIXEL_TYPE);
 
 CHSV colorTargetDefault = CHSV(160, 255, 255); // blue is 160, green is 96
 CHSV colorStartDefault = CHSV(224, 255, 255); // purple is 192, red is 0
@@ -74,19 +107,30 @@ int nearest_bottle_percent = 100;
 // set this via bluetooth, 1==bluetooth send the bmp sensor read and average
 short debug_mode = 0;
 
+// this belongs into comms.ino. But it has to be in a separate file because - Arduino.
+enum scan_callback_result {None, Coyote, Bottle};
+
 void leds_setup() {
   // "Boot" mode
-  FastLED.addLeds<NEOPIXEL, 5>(leds, NUM_LEDS);
-  FastLED.setBrightness(255);
-  leds[0] = CRGB::White;
-  leds[1] = CRGB::White;
-  FastLED.show();
+  px.begin();
+  px.setPixelColor(0, 255, 255, 255);
+  px.setPixelColor(1, 255, 255, 255);
+  px.show();
+
+  //FastLED.addLeds<NEOPIXEL, LED_DATA_PIN>(leds, NUM_LEDS);
+  //FastLED.setBrightness(255);
+  //leds[0] = CRGB::White;
+  //leds[1] = CRGB::White;
+  //FastLED.show();
 }
 
 void leds_startingstate() {
   colorCurrent = colorMyTarget;
-  fill_solid( leds, NUM_LEDS, colorCurrent );
-  FastLED.show();
+  //fill_solid( leds, NUM_LEDS, colorCurrent );
+  //FastLED.show();
+  CRGB rgbcolor = colorCurrent;
+  px.fill( px.Color(rgbcolor.r, rgbcolor.g, rgbcolor. b), 0, NUM_LEDS );
+  px.show();
 }
 
 void leds_do_fade() {
@@ -94,8 +138,11 @@ void leds_do_fade() {
   if ( colorCurrent.h != colorTarget.h ) {
     fade = min(fade + fadespeed, 255);
     colorCurrent = blend(colorWas, colorTarget, fade, SHORTEST_HUES);
-    fill_solid( leds, NUM_LEDS, colorCurrent );
-    FastLED.show();
+    CRGB rgbcolor = colorCurrent;
+    //fill_solid( leds, NUM_LEDS, colorCurrent );
+    //FastLED.show();
+    px.fill( px.Color(rgbcolor.r, rgbcolor.g, rgbcolor.b), 0, NUM_LEDS);
+    px.show();
   }
 }
 
@@ -114,20 +161,29 @@ void check_breath() {
     blow_state = 1;
     fade = 0;
     // fade, but slow while the breath is happening
+#ifdef ENABLE_BLE
     comms_send_breath(true);
+#endif
+#ifdef ENABLE_WIFI
+    wifi_send_breath(true);
+#endif
     fadespeed = 4;
     colorCurrent = colorStart;
     colorWas = colorStart;
   } else if (blow_state == 1 && pread > avg) {
     blow_state = 0;
+#ifdef ENABLE_BLE
     comms_send_breath(false);
+#endif
+#ifdef ENABLE_WIFI
+    wifi_send_breath(false);
+#endif
     // fade back faster now the breath has 'stopped'
     fadespeed = 16;
   }
-  if (debug_mode & 1) comms_uart_send_graph(pread, avg);
+  //if (debug_mode & 1) comms_uart_send_graph(pread, avg);
   //Serial.printf("%d,%d,%d\n",pread,avg,avg-avthres);
   avg = (avg * 8 + pread * 2) / 10;
-
 }
 
 void debug_checkcodespeed() {
@@ -150,6 +206,7 @@ void debug_checkcodespeed() {
 }
 
 void look_for_close_bottles() {
+#ifdef ENABLE_BLE
   //
   // Any other Bottles close?  "Merge" colours if 2, Fixed colour if 3
   //
@@ -195,6 +252,7 @@ void look_for_close_bottles() {
       colorTarget = CHSV(255, 255, 255);
       colorStart = CHSV(42, 255, 255);
   } // otherwise n==1 use the one we found above.
+#endif
 }
 
 void bottle_setup() {
@@ -215,17 +273,53 @@ void setup() {
   airsensor_setup();
   avg = airsensor_read();
   storage_setup();
+#ifdef ESP32
+#ifdef ENABLE_WIFI
+  wifi_setup();
+#endif
+#endif
   leds_startingstate();
+#ifdef ENABLE_BLE
   comms_init(bottle_number);
+#endif
   Serial.printf("I am bottle number %d\n", bottle_number);
+  xTaskCreate(TaskMain, "Main", 10000, nullptr, 1, nullptr);
+#if defined(ENABLE_BLE) && defined(ESP32)
+  xTaskCreate(TaskScan, "Scan", 10000, nullptr, 2, nullptr);
+#endif
 }
 
-void loop() {
+void main_loop() {
+#ifdef ENABLE_BLE
   comms_uart_colorpicker();
+#endif
   debug_checkcodespeed();
   check_breath();
+#ifdef ENABLE_BLE
   comms_check_distance(DISTANCE_TO_SYNC_LEDS);
   look_for_close_bottles();
+#endif /* ENABLE_BLE */
   leds_do_fade();
   delay(100);
 }
+
+// Leave empty - we are using FreeRTOS tasks instead of the Arduino main loop
+void loop() {
+}
+
+void TaskMain(void *pvParameters) {
+  vTaskDelay(200);
+  while (true)
+    main_loop();
+}
+
+// On the ESP32, we scan in a separate task - scanning is a blocking
+// operation. All the communication with the Coyote also happens
+// in this task.
+#if defined(ENABLE_BLE) && defined(ESP32)
+void TaskScan(void *pvParameters) {
+  while (true) {
+    scan_loop();
+  }
+}
+#endif
