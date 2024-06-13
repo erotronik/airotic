@@ -60,7 +60,7 @@ Note that it is now possible to use an ESP32 instead of the Adafruit Itsy Bitsy;
 
 <a href="b7.jpg"><img src="b7.jpg" width="400"></a>
 
-* You can mount the BMP280 board over the air hole using the M2.5 screw. Ensure the component side of the board is against the hole with the leads at the top as shown.
+* You can mount the BMP280 board over the air hole using the M2.5 screw. Ensure the component side of the board is against the hole with the leads at the top as shown.  Important: make sure the sensor (the 2mm square silver part) is facing inwards, against the hole.
 * Connect all the JST cables and bend/tuck them out of the way.
 
 ### Step 8
