@@ -52,7 +52,9 @@ In UART mode type <pre>!B4</pre> or in the app select "Controller" "Control Pad"
 
 ## Debug mode: breath sensor
 
-In UART mode type <pre>!D1</pre>.  You will start to receive the breath sensor data.  Go back and select "Plotter" to get a live graph of readings from the breath sensor. One line is the current value, the other the moving average. Each breath should cause a significant negative peak
+In UART mode type <pre>!D1</pre>.  You will start to receive the breath sensor data.  Go back and select "Plotter" to get a live graph of readings from the breath sensor. One line is the current value, the other the moving average. Each breath should cause a significant negative peak.
+
+In the current code this mode is disabled, you'll need to uncomment line 184/185 in bubbler.ino
 
 ## Debug mode: proximity sensor
 
